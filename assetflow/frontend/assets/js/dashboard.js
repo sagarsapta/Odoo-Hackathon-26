@@ -634,10 +634,10 @@ function buildDetailsRow(role, data) {
       data.bookings.slice(0, 4).forEach(b => {
         bookingsHtml += `
           <tr>
-            <td><strong>${b.resourceName}</strong></td>
-            <td>${b.bookedBy}</td>
-            <td class="small">${b.date} (${b.startTime}-${b.endTime})</td>
-            <td><span class="badge ${b.status === 'Confirmed' ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary'} rounded-pill px-2 py-0.5">${b.status}</span></td>
+            <td><strong>${escapeHtml(b.resourceName)}</strong></td>
+            <td>${escapeHtml(b.bookedBy)}</td>
+            <td class="small">${escapeHtml(b.date)} (${escapeHtml(b.startTime)}-${escapeHtml(b.endTime)})</td>
+            <td><span class="badge ${b.status === 'Confirmed' ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary'} rounded-pill px-2 py-0.5">${escapeHtml(b.status)}</span></td>
           </tr>
         `;
       });
@@ -714,10 +714,10 @@ function buildDetailsRow(role, data) {
       data.bookings.slice(0, 4).forEach(b => {
         html += `
           <tr>
-            <td><strong>${b.resourceName}</strong></td>
-            <td>${b.bookedBy}</td>
-            <td class="small">${b.date} (${b.startTime}-${b.endTime})</td>
-            <td><span class="badge bg-success-subtle text-success rounded-pill px-2 py-0.5">${b.status}</span></td>
+            <td><strong>${escapeHtml(b.resourceName)}</strong></td>
+            <td>${escapeHtml(b.bookedBy)}</td>
+            <td class="small">${escapeHtml(b.date)} (${escapeHtml(b.startTime)}-${escapeHtml(b.endTime)})</td>
+            <td><span class="badge bg-success-subtle text-success rounded-pill px-2 py-0.5">${escapeHtml(b.status)}</span></td>
           </tr>
         `;
       });
@@ -854,10 +854,10 @@ function buildDetailsRow(role, data) {
         data.bookings.forEach(b => {
           html += `
             <tr>
-              <td><strong>${b.resourceName}</strong></td>
-              <td>${b.date}</td>
-              <td class="small">${b.startTime} - ${b.endTime}</td>
-              <td><span class="badge bg-success-subtle text-success rounded-pill px-2 py-0.5">${b.status}</span></td>
+              <td><strong>${escapeHtml(b.resourceName)}</strong></td>
+              <td>${escapeHtml(b.date)}</td>
+              <td class="small">${escapeHtml(b.startTime)} - ${escapeHtml(b.endTime)}</td>
+              <td><span class="badge bg-success-subtle text-success rounded-pill px-2 py-0.5">${escapeHtml(b.status)}</span></td>
             </tr>
           `;
         });

@@ -35,6 +35,26 @@ async function initializeDatabase() {
     const legacyAssets = await Asset.find({ $or: [{ id: { $exists: false } }, { id: null }] }).select('_id').lean();
     for (const asset of legacyAssets) await Asset.updateOne({ _id: asset._id }, { $set: { id: `LEGACY-AST-${asset._id.toString().slice(-8)}` } });
     await Asset.syncIndexes();
+    const bookingDocuments = await Booking.collection.find({}).toArray();
+    for (const booking of bookingDocuments) {
+        const resourceName = booking.resourceName || booking.resource || booking.resource_name || booking.assetName;
+        const bookedBy = booking.bookedBy || booking.bookedByName || booking.userName;
+        const startDate = booking.startDate || booking.bookingStart;
+        const endDate = booking.endDate || booking.bookingEnd;
+        const startValue = booking.startTime || booking.start || startDate;
+        const endValue = booking.endTime || booking.end || endDate;
+        const start = startValue ? new Date(startValue) : null;
+        const end = endValue ? new Date(endValue) : null;
+        const date = booking.date || booking.bookingDate || (start && !Number.isNaN(start.getTime()) ? start.toISOString().slice(0, 10) : null);
+        const startTime = booking.startTime || (start && !Number.isNaN(start.getTime()) ? start.toISOString().slice(11, 16) : null);
+        const endTime = booking.endTime || (end && !Number.isNaN(end.getTime()) ? end.toISOString().slice(11, 16) : null);
+        if (!resourceName || !bookedBy || !date || !startTime || !endTime) continue;
+        await Booking.collection.updateOne({ _id: booking._id }, { $set: {
+            id: booking.id || `LEGACY-BKG-${booking._id.toString().slice(-8)}`,
+            resourceName, bookedBy, date, startTime, endTime,
+            status: booking.status || 'Confirmed', department: booking.department || 'IT'
+        } });
+    }
     const password = await bcrypt.hash('Password123!', 12);
     const demoUsers = [
         ['admin@assetflow.com', 'Rahul Sharma', 'Admin', 'Administration'],
@@ -46,7 +66,9 @@ async function initializeDatabase() {
         ['employee.it@assetflow.com', 'Riya Shah', 'Employee', 'IT'],
         ['employee.hr@assetflow.com', 'Arjun Patel', 'Employee', 'Human Resources'],
         ['employee.finance@assetflow.com', 'Dev Joshi', 'Employee', 'Finance'],
-        ['employee.ops@assetflow.com', 'Mehul Shah', 'Employee', 'Operations']
+        ['employee.ops@assetflow.com', 'Mehul Shah', 'Employee', 'Operations'],
+        ['employee.marketing@assetflow.com', 'Anjali Desai', 'Employee', 'Marketing'],
+        ['employee.sales@assetflow.com', 'Yash Patel', 'Employee', 'Sales']
     ];
     for (const [email, fullName, role, department] of demoUsers) {
         await User.updateOne({ email }, { $setOnInsert: { email, password, fullName, role, department, isVerified: true, status: 'Active' } }, { upsert: true });
@@ -74,6 +96,8 @@ async function initializeDatabase() {
         await Allocation.updateOne({ id: `ALC-${String(index + 1).padStart(3, '0')}` }, { $setOnInsert: { id: `ALC-${String(index + 1).padStart(3, '0')}`, assetId: asset.id, assetName: asset.name, allocatedTo: asset.owner, date: '2026-01-15', status: 'Approved', department: asset.department, requestedBy: asset.owner, requestedByEmail: demoUsers[(index % 9) + 1][0], targetRole: 'Approved', notes: 'Demo allocation' } }, { upsert: true });
     }
     await Booking.updateOne({ id: 'BKG-001' }, { $setOnInsert: { id: 'BKG-001', resourceName: 'Conference Room A', bookedBy: 'Riya Shah', date: '2099-01-15', startTime: '10:00', endTime: '11:00', status: 'Confirmed', department: 'IT' } }, { upsert: true });
+    await Booking.updateOne({ id: 'BKG-002' }, { $setOnInsert: { id: 'BKG-002', resourceName: 'Conference Room B', bookedBy: 'Neha Mehta', date: '2099-01-16', startTime: '14:00', endTime: '15:30', status: 'Confirmed', department: 'Human Resources' } }, { upsert: true });
+    await Booking.updateOne({ id: 'BKG-003' }, { $setOnInsert: { id: 'BKG-003', resourceName: 'Training Room', bookedBy: 'Priya Patel', date: '2026-01-20', startTime: '09:00', endTime: '10:00', status: 'Cancelled', department: 'IT' } }, { upsert: true });
     await Maintenance.updateOne({ id: 'MNT-001' }, { $setOnInsert: { id: 'MNT-001', assetId: 'AST-001', assetName: 'Dell Latitude 5440', type: 'Battery replacement', description: 'Battery service required', cost: 4500, date: '2026-02-10', status: 'Pending' } }, { upsert: true });
     await Audit.updateOne({ id: 'AUD-001' }, { $setOnInsert: { id: 'AUD-001', name: 'Annual Asset Verification', date: '2026-03-01', auditor: 'Amit Shah', progress: 65, status: 'In Progress' } }, { upsert: true });
     await Notification.updateOne({ id: 'NTF-DEMO-001' }, { $setOnInsert: { id: 'NTF-DEMO-001', title: 'Welcome to AssetFlow', message: 'Demo data is ready for your presentation.', type: 'info', date: new Date().toISOString().replace('T', ' ').substring(0, 16), read: false, targetRole: null, targetUserEmail: null } }, { upsert: true });

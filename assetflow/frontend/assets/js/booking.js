@@ -53,13 +53,13 @@ function initCalendar() {
     eventClick: function(info) {
       const b = info.event.extendedProps;
       Swal.fire({
-        title: info.event.title,
+        title: escapeHtml(info.event.title),
         html: `
           <div class="text-start">
-            <p><strong>Booked By:</strong> ${b.bookedBy}</p>
-            <p><strong>Date:</strong> ${b.date}</p>
-            <p><strong>Time Slot:</strong> ${b.startTime} - ${b.endTime}</p>
-            <p><strong>Status:</strong> ${b.status}</p>
+            <p><strong>Booked By:</strong> ${escapeHtml(b.bookedBy)}</p>
+            <p><strong>Date:</strong> ${escapeHtml(b.date)}</p>
+            <p><strong>Time Slot:</strong> ${escapeHtml(b.startTime)} - ${escapeHtml(b.endTime)}</p>
+            <p><strong>Status:</strong> ${escapeHtml(b.status)}</p>
           </div>
         `,
         icon: 'info',

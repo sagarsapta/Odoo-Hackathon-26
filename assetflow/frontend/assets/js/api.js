@@ -19,6 +19,21 @@ const api = axios.create({
   }
 });
 
+function normalizeBooking(booking) {
+  const source = booking || {};
+  return {
+    ...source,
+    id: source.id || 'Unknown booking',
+    resourceName: source.resourceName || source.resource || source.resource_name || 'Resource unavailable',
+    bookedBy: source.bookedBy || source.bookedByName || source.userName || 'User unavailable',
+    date: source.date || source.bookingDate || 'Date unavailable',
+    startTime: source.startTime || source.start || '--:--',
+    endTime: source.endTime || source.end || '--:--',
+    status: source.status || 'Unknown',
+    department: source.department || 'Unassigned'
+  };
+}
+
 // Request Interceptor: Attach JWT Token
 api.interceptors.request.use(
   (config) => {
@@ -283,7 +298,7 @@ const ApiService = {
     list: async () => {
       try {
         const res = await api.get('/bookings');
-        return res.data;
+        return Array.isArray(res.data) ? res.data.map(normalizeBooking) : [];
       } catch (err) {
         return handleApiError(err);
       }
