@@ -58,13 +58,16 @@ body {
   width: 6px;
   height: 6px;
 }
+
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
 ::-webkit-scrollbar-thumb {
   background: var(--border-color);
   border-radius: 4px;
 }
+
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-muted);
 }
@@ -400,8 +403,13 @@ select.form-control-custom,
 }
 
 @keyframes rotation {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* Skeleton Loading */
@@ -431,8 +439,13 @@ select.form-control-custom,
 }
 
 @keyframes skeleton-loading {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 /* Breadcrumbs */
@@ -450,7 +463,7 @@ select.form-control-custom,
   font-weight: 500;
 }
 
-.breadcrumb-item-custom + .breadcrumb-item-custom::before {
+.breadcrumb-item-custom+.breadcrumb-item-custom::before {
   content: "/";
   padding: 0 0.5rem;
   color: var(--text-muted);
@@ -563,16 +576,16 @@ footer {
   .sidebar {
     left: calc(-1 * var(--sidebar-width));
   }
-  
+
   .sidebar.active {
     left: 0;
   }
-  
+
   .main-content {
     margin-left: 0;
     max-width: 100%;
   }
-  
+
   .navbar-toggler-custom {
     display: block !important;
   }
@@ -654,8 +667,10 @@ footer {
 
 /* Print Styles for PDF Generation */
 @media print {
+
   /* Reset variables to print-friendly light theme values */
-  :root, [data-theme="dark"] {
+  :root,
+  [data-theme="dark"] {
     --bg-color: #ffffff !important;
     --card-bg: #ffffff !important;
     --text-color: #000000 !important;
@@ -665,7 +680,10 @@ footer {
   }
 
   /* Disable flex and height constraints to allow natural multi-page flow */
-  html, body, .app-wrapper, .main-content {
+  html,
+  body,
+  .app-wrapper,
+  .main-content {
     display: block !important;
     height: auto !important;
     min-height: auto !important;
@@ -745,7 +763,19 @@ footer {
   }
 
   /* Headings color force */
-  h1, h2, h3, h4, h5, h6, p, span, td, th, div, strong, small {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  p,
+  span,
+  td,
+  th,
+  div,
+  strong,
+  small {
     color: #000000 !important;
   }
 

@@ -37,7 +37,7 @@ function initCalendar() {
       right: 'dayGridMonth,timeGridWeek'
     },
     events: [],
-    eventContent: function(arg) {
+    eventContent: function (arg) {
       const b = arg.event.extendedProps;
       if (!b) return;
       return {
@@ -50,7 +50,7 @@ function initCalendar() {
         `
       };
     },
-    eventClick: function(info) {
+    eventClick: function (info) {
       const b = info.event.extendedProps;
       Swal.fire({
         title: escapeHtml(info.event.title),
@@ -204,8 +204,8 @@ function runAiResourceDetection(selectedResource) {
   cardEl.classList.remove('d-none');
 
   // Filter confirmed bookings for this specific resource
-  const resBookings = allBookingsList.filter(b => 
-    b.status === 'Confirmed' && 
+  const resBookings = allBookingsList.filter(b =>
+    b.status === 'Confirmed' &&
     b.resourceName.toLowerCase().includes(selectedResource.toLowerCase())
   );
 
@@ -271,7 +271,7 @@ function checkConflictAndRenderTimeline() {
   }
 
   // Filter confirmed bookings for this resource & date
-  const dayBookings = allBookingsList.filter(b => 
+  const dayBookings = allBookingsList.filter(b =>
     b.status === 'Confirmed' &&
     b.resourceName === selectedResource &&
     b.date === selectedDate
@@ -315,7 +315,7 @@ function checkConflictAndRenderTimeline() {
   // 2. Real-Time Conflict Detection for current selected time window
   if (startTime && endTime) {
     const conflict = dayBookings.find(b => (startTime < b.endTime && endTime > b.startTime));
-    
+
     if (conflict) {
       alertEl.className = 'alert alert-danger py-2 px-3 mt-3 mb-3.5 rounded-2 border-danger d-block';
       alertEl.style.fontSize = '0.78rem';
@@ -427,7 +427,7 @@ function setupEventListeners() {
   if (openBtn) {
     openBtn.addEventListener('click', () => {
       document.getElementById('booking-form').reset();
-      
+
       // Auto-set date to today
       const dateInput = document.getElementById('booking-date');
       if (dateInput) dateInput.value = new Date().toISOString().split('T')[0];
@@ -437,7 +437,7 @@ function setupEventListeners() {
       if (user && user.name) {
         document.getElementById('booking-name').value = user.name;
       }
-      
+
       // Clear errors
       document.querySelectorAll('.invalid-feedback').forEach(el => el.textContent = '');
       document.querySelectorAll('.form-control, .form-select').forEach(el => el.classList.remove('is-invalid'));
@@ -577,7 +577,7 @@ function setupEventListeners() {
       const resourceVal = document.getElementById('timeline-resource-select').value;
       const openBtn = document.getElementById('btn-open-booking-modal');
       if (openBtn) openBtn.click();
-      
+
       // Auto-set the selected resource in the booking modal select field
       setTimeout(() => {
         const modalSelect = document.getElementById('booking-resource');
@@ -595,7 +595,7 @@ function setupEventListeners() {
       const val = e.target.value;
       const timelineGrid = document.querySelector('#btn-timeline-book-shortcut')?.previousElementSibling;
       if (!timelineGrid || !val) return;
-      
+
       try {
         const bookings = await window.ApiService.bookings.list();
         const todayStr = new Date().toISOString().split('T')[0];

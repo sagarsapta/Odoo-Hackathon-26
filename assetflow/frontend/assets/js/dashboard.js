@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.AssetFlowLoader.show();
   try {
     const role = window.RbacService.getCurrentUserRole() || 'Employee';
-    
+
     const currentUser = window.RbacService.getCurrentUser() || {};
     const userDept = currentUser.department || 'IT';
 
@@ -70,7 +70,7 @@ async function loadDashboardData(role) {
         const aDept = (a.department || '').toLowerCase();
         const aTarget = (a.allocatedTo || '').toLowerCase();
         return (aDept && (aDept.includes(deptLower) || deptLower.includes(aDept))) ||
-               (aTarget && (aTarget.includes(deptLower) || deptLower.includes(aTarget)));
+          (aTarget && (aTarget.includes(deptLower) || deptLower.includes(aTarget)));
       });
       const deptAllocatedAssetIds = new Set(
         filteredAllocations.filter(a => a.status === 'Approved' && a.assetId).map(a => String(a.assetId))
@@ -230,10 +230,10 @@ function buildKpiCards(role, data) {
     const user = window.RbacService.getCurrentUser() || {};
     const userName = (user.fullName || user.name || '').toLowerCase();
     const userDept = (user.department || 'Management').toLowerCase();
-    
+
     const myAssetsCount = data.assets.filter(a => a.owner && a.owner.toLowerCase() === userName).length;
     const myPendingMaint = data.maintenance.filter(m => m.status === 'Pending').length;
-    
+
     cards = [
       { label: 'My Assets', val: myAssetsCount, desc: 'Allocated to you', icon: 'fa-user-gear', bg: 'bg-info-subtle text-info' },
       { label: 'Department Assets', val: data.assets.length, desc: `${user.department || 'Department'} Resources`, icon: 'fa-boxes-stacked', bg: 'bg-primary-subtle text-primary' },
@@ -420,7 +420,7 @@ function renderRoleCharts(role, data) {
       if (legendEl) {
         let legendHtml = '<div class="d-flex flex-wrap justify-content-center gap-2 mt-2">';
         finalLabels.forEach((label, i) => {
-          const pct = Math.round((finalData[i] / finalData.reduce((a,b)=>a+b,0)) * 100);
+          const pct = Math.round((finalData[i] / finalData.reduce((a, b) => a + b, 0)) * 100);
           legendHtml += `
             <span class="d-flex align-items-center gap-1 fs-8">
               <span style="display:inline-block; width:8px; height:8px; background-color:${colors[i % colors.length]}; border-radius:50%;"></span>

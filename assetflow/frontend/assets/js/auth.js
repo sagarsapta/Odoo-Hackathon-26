@@ -107,7 +107,7 @@ function setupLoginForm() {
 
     try {
       const response = await ApiService.auth.login({ email, password, role });
-      
+
       const Toast = Swal.mixin({
         toast: true,
         position: 'top-end',
@@ -125,7 +125,7 @@ function setupLoginForm() {
       window.location.href = 'dashboard.html';
     } catch (err) {
       console.error(err);
-      
+
       if (err.message.includes("verify your email")) {
         // Unverified email handler
         Swal.fire({
@@ -238,7 +238,7 @@ function setupOtpVerificationForm() {
     timerInterval = setInterval(() => {
       countdown--;
       if (timerVal) timerVal.textContent = countdown;
-      
+
       if (countdown <= 0) {
         clearInterval(timerInterval);
         if (resendBtn) resendBtn.disabled = false;
@@ -251,12 +251,12 @@ function setupOtpVerificationForm() {
   digits.forEach((digit, idx) => {
     digit.addEventListener('input', (e) => {
       const val = e.target.value;
-      
+
       // Auto focus next box
       if (val && idx < digits.length - 1) {
         digits[idx + 1].focus();
       }
-      
+
       checkOtpComplete();
     });
 
@@ -272,7 +272,7 @@ function setupOtpVerificationForm() {
     digits.forEach(d => {
       if (!d.value) completed = false;
     });
-    
+
     if (verifyBtn) {
       verifyBtn.disabled = !completed;
     }
@@ -299,7 +299,7 @@ function setupOtpVerificationForm() {
   // Submit OTP Action
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    
+
     let otpCode = '';
     digits.forEach(d => otpCode += d.value);
 
@@ -310,7 +310,7 @@ function setupOtpVerificationForm() {
 
     try {
       await ApiService.auth.verifyOtp(email, otpCode);
-      
+
       Swal.fire({
         title: 'Account Activated!',
         text: 'Your email has been verified successfully. Redirecting to login.',
@@ -365,7 +365,7 @@ function setupForgotPasswordForm() {
 
     try {
       await ApiService.auth.forgotPassword(email);
-      
+
       Swal.fire({
         title: 'OTP Code Sent',
         text: 'A password reset OTP code has been sent to your email.',
@@ -455,7 +455,7 @@ function setupResetPasswordForm() {
 
     try {
       await ApiService.auth.resetPassword(email, otp, password);
-      
+
       Swal.fire({
         title: 'Password Updated!',
         text: 'Your password has been reset successfully. You can now log in.',

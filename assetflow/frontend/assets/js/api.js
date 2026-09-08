@@ -4,12 +4,12 @@
  * Provides a fallback to LocalStorage for demonstration when the backend is unreachable.
  */
 
-const API_BASE_URL = window.location.origin.includes('localhost') || 
-  window.location.origin.includes('127.0.0.1') || 
-  window.location.protocol === 'file:' || 
+const API_BASE_URL = window.location.origin.includes('localhost') ||
+  window.location.origin.includes('127.0.0.1') ||
+  window.location.protocol === 'file:' ||
   window.location.origin === 'null'
-    ? 'http://localhost:3000/api'
-    : '/api';
+  ? 'http://localhost:3000/api'
+  : '/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -53,17 +53,17 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
-    
+
     // Check if error is 401 (Unauthorized) and not already retrying
     if (error.response && error.response.status === 401 && !originalRequest._retry) {
       // Clear token and redirect to login if not already on auth pages
       const authPages = ['login.html', 'signup.html', 'forgot-password.html', 'otp-verification.html', 'reset-password.html'];
       const currentPage = window.location.pathname.split('/').pop();
-      
+
       if (!authPages.includes(currentPage)) {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
-        
+
         Swal.fire({
           title: 'Session Expired',
           text: 'Please log in again.',
@@ -82,9 +82,9 @@ api.interceptors.response.use(
 // Helper to notify of Network/Server failures and fallback
 function handleApiError(error, fallbackCallback) {
   console.warn("API Request Failed:", error);
-  
+
   const isNetworkError = !error.response;
-  
+
   if (isNetworkError) {
     // Notify user of connection issue and fallback
     const Toast = Swal.mixin({
@@ -94,22 +94,22 @@ function handleApiError(error, fallbackCallback) {
       timer: 3500,
       timerProgressBar: true,
     });
-    
+
     Toast.fire({
       icon: 'info',
       title: 'Connecting to local sandbox (Offline mode)'
     });
-    
+
     if (fallbackCallback) {
       return fallbackCallback();
     }
   }
-  
+
   // Extract error message
   const message = error.response && error.response.data && error.response.data.message
     ? error.response.data.message
     : 'Something went wrong. Please try again.';
-    
+
   throw new Error(message);
 }
 

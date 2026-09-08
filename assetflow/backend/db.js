@@ -49,11 +49,13 @@ async function initializeDatabase() {
         const startTime = booking.startTime || (start && !Number.isNaN(start.getTime()) ? start.toISOString().slice(11, 16) : null);
         const endTime = booking.endTime || (end && !Number.isNaN(end.getTime()) ? end.toISOString().slice(11, 16) : null);
         if (!resourceName || !bookedBy || !date || !startTime || !endTime) continue;
-        await Booking.collection.updateOne({ _id: booking._id }, { $set: {
-            id: booking.id || `LEGACY-BKG-${booking._id.toString().slice(-8)}`,
-            resourceName, bookedBy, date, startTime, endTime,
-            status: booking.status || 'Confirmed', department: booking.department || 'IT'
-        } });
+        await Booking.collection.updateOne({ _id: booking._id }, {
+            $set: {
+                id: booking.id || `LEGACY-BKG-${booking._id.toString().slice(-8)}`,
+                resourceName, bookedBy, date, startTime, endTime,
+                status: booking.status || 'Confirmed', department: booking.department || 'IT'
+            }
+        });
     }
     const password = await bcrypt.hash('Password123!', 12);
     const demoUsers = [

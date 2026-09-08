@@ -4,7 +4,7 @@
  */
 
 // Dynamically load permission.js if not already loaded
-(function() {
+(function () {
   if (typeof RbacService === 'undefined') {
     const isSubPage = window.location.pathname.includes('/pages/');
     const path = isSubPage ? '../assets/js/permission.js' : 'assets/js/permission.js';
@@ -46,7 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const authPages = ['login.html', 'signup.html', 'forgot-password.html', 'otp-verification.html', 'reset-password.html', 'index.html', ''];
   const currentPage = window.location.pathname.split('/').pop() || 'index.html';
   const token = localStorage.getItem('token');
-  
+
   if (!authPages.includes(currentPage) && !token) {
     window.location.href = isSubPage ? 'login.html' : 'pages/login.html';
     return;
@@ -264,7 +264,7 @@ function setupGlobalInteractions() {
       const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
       document.documentElement.setAttribute('data-theme', newTheme);
       localStorage.setItem('theme', newTheme);
-      
+
       // Update icon
       const icon = themeToggle.querySelector('i');
       if (icon) {
@@ -296,20 +296,20 @@ function setupGlobalInteractions() {
   // Ripple effect on buttons
   const buttons = document.querySelectorAll('.btn-primary-custom, .btn-secondary-custom, .btn-primary, .btn-secondary');
   buttons.forEach(button => {
-    button.addEventListener('click', function(e) {
+    button.addEventListener('click', function (e) {
       // Don't apply if disabled
       if (this.disabled) return;
-      
+
       const x = e.clientX - this.getBoundingClientRect().left;
       const y = e.clientY - this.getBoundingClientRect().top;
-      
+
       const ripple = document.createElement('span');
       ripple.classList.add('ripple');
       ripple.style.left = `${x}px`;
       ripple.style.top = `${y}px`;
-      
+
       this.appendChild(ripple);
-      
+
       setTimeout(() => {
         ripple.remove();
       }, 600);
@@ -329,7 +329,7 @@ function setupGlobalInteractions() {
 
       const nameElements = ['sidebar-username', 'navbar-username'];
       const emailElements = ['navbar-email'];
-      
+
       nameElements.forEach(id => {
         const el = document.getElementById(id);
         if (el) el.textContent = user.fullName || user.name || 'User';
@@ -387,7 +387,7 @@ function setupGlobalInteractions() {
 
 // Global Loader controls
 window.AssetFlowLoader = {
-  show: function() {
+  show: function () {
     let loader = document.getElementById('global-loader');
     if (!loader) {
       loader = document.createElement('div');
@@ -400,7 +400,7 @@ window.AssetFlowLoader = {
       loader.style.opacity = '1';
     }
   },
-  hide: function() {
+  hide: function () {
     const loader = document.getElementById('global-loader');
     if (loader) {
       loader.style.opacity = '0';
@@ -419,7 +419,7 @@ async function loadNavbarNotifications() {
   try {
     const list = await window.ApiService.notifications.list();
     const unreadCount = list.filter(n => !n.read).length;
-    
+
     if (badge) {
       if (unreadCount > 0) {
         badge.textContent = unreadCount;
@@ -447,7 +447,7 @@ async function loadNavbarNotifications() {
 
     displayList.forEach(n => {
       const li = document.createElement('li');
-      
+
       let iconClass = 'fa-info-circle';
       let iconColorClass = 'bg-info-subtle text-info';
       if (n.type === 'warning') {
