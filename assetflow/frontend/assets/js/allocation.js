@@ -85,7 +85,7 @@ async function populateDepartmentDropdowns() {
   const lblWorkspace = document.getElementById('lbl-workspace-alloc-to');
   const lblModal = document.getElementById('lbl-alloc-to');
 
-  // Fetch real departments strictly from MySQL Database
+  // Fetch departments from the backend database.
   let realDepts = [];
   try {
     const deptsRes = window.ApiService.departments ? await window.ApiService.departments.list() : [];
@@ -106,15 +106,15 @@ async function populateDepartmentDropdowns() {
       const usersList = await window.ApiService.users.list();
       if (Array.isArray(usersList)) {
         const userDept = (currentUser.department || '').toLowerCase();
-        
+
         const isRetiredOrFormer = (u) => {
           const status = (u.status || '').toLowerCase();
           const roleStr = (u.role || '').toLowerCase();
           return status.includes('former') || status.includes('retired') || status.includes('inactive') ||
-                 roleStr.includes('former') || roleStr.includes('alumni') || roleStr.includes('retired');
+            roleStr.includes('former') || roleStr.includes('alumni') || roleStr.includes('retired');
         };
 
-        employees = usersList.filter(u => 
+        employees = usersList.filter(u =>
           u.department && userDept && (u.department.toLowerCase().includes(userDept) || userDept.includes(u.department.toLowerCase())) &&
           !isRetiredOrFormer(u)
         );
@@ -183,7 +183,7 @@ async function populateDepartmentDropdowns() {
     }
   }
 
-  // Transfer To Select (strictly real departments from DB)
+  // Transfer To Select (strictly real departments from the backend)
   const transferToSelect = document.getElementById('workspace-transfer-to');
   if (transferToSelect) {
     if (realDepts.length === 0) {
@@ -215,7 +215,7 @@ async function initializeWorkspace() {
           const alDept = (al.department || '').toLowerCase();
           const alTarget = (al.allocatedTo || '').toLowerCase();
           return (alDept && (alDept.includes(userDept) || userDept.includes(alDept))) ||
-                 (alTarget && (alTarget.includes(userDept) || userDept.includes(alTarget)));
+            (alTarget && (alTarget.includes(userDept) || userDept.includes(alTarget)));
         }).map(al => String(al.assetId))
       );
 
@@ -224,14 +224,14 @@ async function initializeWorkspace() {
         const aOwner = (a.owner || '').toLowerCase();
         const aLoc = (a.location || '').toLowerCase();
         return (aDept && (aDept.includes(userDept) || userDept.includes(aDept))) ||
-               (aOwner && (aOwner.includes(userDept) || userDept.includes(aOwner))) ||
-               (aLoc && (aLoc.includes(userDept) || userDept.includes(aLoc))) ||
-               deptAllocAssetIds.has(String(a.id));
+          (aOwner && (aOwner.includes(userDept) || userDept.includes(aOwner))) ||
+          (aLoc && (aLoc.includes(userDept) || userDept.includes(aLoc))) ||
+          deptAllocAssetIds.has(String(a.id));
       });
     } else {
       loadedAssets = allAssets;
     }
-    
+
     // Fill workspace asset dropdown
     const assetSelect = document.getElementById('workspace-asset-select');
     if (assetSelect) {
@@ -320,7 +320,7 @@ function handleAssetSelection(assetId) {
         const options = Array.from(workspaceAllocToSelect.options);
         isMemberOwner = options.some(opt => opt.value && opt.value.toLowerCase() === ownerLower);
       }
-    } catch (e) {}
+    } catch (e) { }
 
     if (isMemberOwner) {
       // Currently assigned to an employee in this department -> Can re-assign
@@ -400,12 +400,12 @@ function renderAllocationsTable(allocations, tableSelector = '#allocations-table
         canApprove = true;
       }
     }
-    
+
     const isOwner = (alloc.allocatedTo && alloc.allocatedTo.toLowerCase() === userName) || isSelfRequest;
-    
+
     let statusClass = 'bg-warning text-dark';
     let actionButtons = '';
-    
+
     if (alloc.status === 'Approved') {
       statusClass = 'bg-success';
       actionButtons = (canApprove || isOwner) ? `
@@ -623,7 +623,7 @@ async function setupEventListeners() {
               const alDept = (al.department || '').toLowerCase();
               const alTarget = (al.allocatedTo || '').toLowerCase();
               return (alDept && (alDept.includes(userDept) || userDept.includes(alDept))) ||
-                     (alTarget && (alTarget.includes(userDept) || userDept.includes(alTarget)));
+                (alTarget && (alTarget.includes(userDept) || userDept.includes(alTarget)));
             }).map(al => String(al.assetId))
           );
 
@@ -632,9 +632,9 @@ async function setupEventListeners() {
             const aOwner = (a.owner || '').toLowerCase();
             const aLoc = (a.location || '').toLowerCase();
             return (aDept && (aDept.includes(userDept) || userDept.includes(aDept))) ||
-                   (aOwner && (aOwner.includes(userDept) || userDept.includes(aOwner))) ||
-                   (aLoc && (aLoc.includes(userDept) || userDept.includes(aLoc))) ||
-                   deptAllocAssetIds.has(String(a.id));
+              (aOwner && (aOwner.includes(userDept) || userDept.includes(aOwner))) ||
+              (aLoc && (aLoc.includes(userDept) || userDept.includes(aLoc))) ||
+              deptAllocAssetIds.has(String(a.id));
           });
         }
 
@@ -661,7 +661,7 @@ async function setupEventListeners() {
 
         // Reset form
         document.getElementById('alloc-form').reset();
-        
+
         // Clear errors
         document.querySelectorAll('.invalid-feedback').forEach(el => el.textContent = '');
         document.querySelectorAll('.form-control, .form-select').forEach(el => el.classList.remove('is-invalid'));
@@ -676,7 +676,7 @@ async function setupEventListeners() {
   }
 
   // Approval/Rejection/Return Actions for both Department Queue and My Requests tables
-  $(document).on('click', '.btn-action', async function() {
+  $(document).on('click', '.btn-action', async function () {
     const role = window.RbacService.getCurrentUserRole();
     const tr = $(this).closest('tr');
     const id = tr.attr('data-id');
@@ -733,7 +733,7 @@ async function setupEventListeners() {
         // Fetch available assets
         const assetsList = await window.ApiService.assets.list();
         const availableAssets = assetsList.filter(a => !a.owner && a.status !== 'Disposed');
-        
+
         if (availableAssets.length === 0) {
           Swal.fire('No Assets Available', 'There are no available assets in the inventory to allocate.', 'warning');
           return;
@@ -766,14 +766,14 @@ async function setupEventListeners() {
         window.AssetFlowLoader.show();
         try {
           await window.ApiService.allocations.action(id, 'Approved', selectedAssetId);
-          
+
           Swal.fire({
             title: 'Success',
             text: `Allocation request approved and asset ${selectedAssetId} assigned successfully.`,
             icon: 'success',
             confirmButtonColor: '#2563EB'
           });
-          
+
           await loadAllocations();
           await initializeWorkspace();
           const workspaceAssetSelect = document.getElementById('workspace-asset-select');
@@ -817,14 +817,14 @@ async function setupEventListeners() {
           window.AssetFlowLoader.show();
           try {
             await window.ApiService.allocations.action(id, action);
-            
+
             Swal.fire({
               title: 'Success',
               text: `Allocation request ${action.toLowerCase()} successfully.`,
               icon: 'success',
               confirmButtonColor: '#2563EB'
             });
-            
+
             await loadAllocations();
             await initializeWorkspace();
             const workspaceAssetSelect = document.getElementById('workspace-asset-select');
@@ -848,7 +848,7 @@ async function setupEventListeners() {
   if (form) {
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      
+
       // Clear errors
       document.querySelectorAll('.invalid-feedback').forEach(el => el.textContent = '');
       document.querySelectorAll('.form-control, .form-select').forEach(el => el.classList.remove('is-invalid'));
