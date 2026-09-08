@@ -162,6 +162,15 @@ const ApiService = {
       } catch (err) {
         return handleApiError(err);
       }
+    },
+
+    devReset: async () => {
+      try {
+        const res = await api.post('/dev/reset-db');
+        return res.data;
+      } catch (err) {
+        return handleApiError(err);
+      }
     }
   },
 

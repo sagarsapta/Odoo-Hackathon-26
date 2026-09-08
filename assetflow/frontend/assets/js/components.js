@@ -19,15 +19,19 @@ function getUserInitials(name) {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
+function escapeHtml(value) {
+  return String(value || '').replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
+}
+
 function getAvatarMarkup(user, width = 40, height = 40, idPrefix = '') {
-  if (user && user.avatar) {
-    return `<img src="${user.avatar}" alt="Avatar" class="rounded-circle" width="${width}" height="${height}" id="${idPrefix}avatar">`;
+  if (user && typeof user.avatar === 'string' && /^(https?:\/\/|data:image\/)/i.test(user.avatar)) {
+    return `<img src="${escapeHtml(user.avatar)}" alt="Avatar" class="rounded-circle" width="${width}" height="${height}" id="${escapeHtml(idPrefix)}avatar">`;
   }
   const initials = getUserInitials(user ? (user.fullName || user.name) : 'User');
   const sizeStyle = `width: ${width}px; height: ${height}px; font-size: ${width * 0.4}px; font-weight: 600; display: flex; align-items: center; justify-content: center; border-radius: 50%;`;
   return `
     <div class="bg-primary text-white" style="${sizeStyle}" id="${idPrefix}avatar-placeholder">
-      ${initials}
+      ${escapeHtml(initials)}
     </div>
   `;
 }

@@ -59,6 +59,13 @@ function authenticateToken(req, res, next) {
     });
 }
 
+function requireRole(...roles) {
+    return (req, res, next) => {
+        if (!roles.some((role) => normalizeRole(role) === normalizeRole(req.user?.role))) return res.status(403).json({ message: 'Access denied for this role.' });
+        next();
+    };
+}
+
 function handleError(res, error) {
     console.error(error);
     if (error.code === 11000) return res.status(409).json({ message: 'A record with that unique value already exists.' });
@@ -66,8 +73,8 @@ function handleError(res, error) {
     return res.status(500).json({ message: 'Database operation failed.' });
 }
 
-app.post('/api/dev/reset-db', async (req, res) => {
-    if (process.env.NODE_ENV === 'production') return res.status(404).json({ message: 'Not found.' });
+app.post('/api/dev/reset-db', authenticateToken, requireRole('Admin'), async (req, res) => {
+    if (process.env.NODE_ENV === 'production' || process.env.ENABLE_DEV_RESET !== 'true') return res.status(404).json({ message: 'Not found.' });
     try { await db.resetDatabase(); res.json({ success: true, message: 'Database reset successfully!' }); } catch (error) { handleError(res, error); }
 });
 
@@ -77,12 +84,15 @@ async function handleRegister(req, res) {
     try {
         const cleanEmail = email.trim().toLowerCase();
         if (await User.exists({ email: cleanEmail })) return res.status(400).json({ message: 'Email address is already registered.' });
-        await User.create({ email: cleanEmail, password: await bcrypt.hash(password.trim(), 12), fullName: fullName.trim(), role: (role || 'Employee').trim(), department: (department || 'IT').trim(), isVerified: true, status: 'Active' });
+        const requestedRole = (role || 'Employee').trim();
+        const allowedRoles = ['Employee', 'Department Head', 'Asset Manager'];
+        if (!allowedRoles.some((allowedRole) => normalizeRole(allowedRole) === normalizeRole(requestedRole))) return res.status(400).json({ message: 'Invalid role.' });
+        await User.create({ email: cleanEmail, password: await bcrypt.hash(password.trim(), 12), fullName: fullName.trim(), role: requestedRole, department: (department || 'IT').trim(), isVerified: true, status: 'Active' });
         res.status(201).json({ success: true, message: 'User registered successfully!' });
     } catch (error) { handleError(res, error); }
 }
-app.post('/api/auth/register', handleRegister);
-app.post('/api/auth/signup', handleRegister);
+app.post('/api/auth/register', authenticateToken, requireRole('Admin'), handleRegister);
+app.post('/api/auth/signup', authenticateToken, requireRole('Admin'), handleRegister);
 
 async function handleLogin(req, res) {
     const { email, password, role } = req.body;
@@ -113,20 +123,20 @@ app.post('/api/auth/reset-password', async (req, res) => {
 });
 
 app.get('/api/users', authenticateToken, async (req, res) => { try { res.json(cleanMany(await User.find().select('-password').sort({ fullName: 1 }).lean())); } catch (error) { handleError(res, error); } });
-app.get('/api/org', async (req, res) => { try { res.json(clean(await Organization.findOne().lean()) || {}); } catch (error) { handleError(res, error); } });
+app.get('/api/org', authenticateToken, async (req, res) => { try { res.json(clean(await Organization.findOne().lean()) || {}); } catch (error) { handleError(res, error); } });
 app.put('/api/org', authenticateToken, async (req, res) => { try { await Organization.findOneAndUpdate({}, { $set: req.body }, { upsert: true, new: true, setDefaultsOnInsert: true }); res.json({ success: true, message: 'Organization saved successfully!' }); } catch (error) { handleError(res, error); } });
 
-app.get('/api/departments', async (req, res) => { try { res.json(cleanMany(await Department.find().sort({ name: 1 }).lean())); } catch (error) { handleError(res, error); } });
+app.get('/api/departments', authenticateToken, async (req, res) => { try { res.json(cleanMany(await Department.find().sort({ name: 1 }).lean())); } catch (error) { handleError(res, error); } });
 app.post('/api/departments', authenticateToken, async (req, res) => { if (req.user.role !== 'Admin') return res.status(403).json({ message: 'Access Denied: Only administrators can add new departments.' }); if (!req.body.name?.trim()) return res.status(400).json({ message: 'Department name is required.' }); try { if (await Department.exists({ name: req.body.name.trim() })) return res.status(400).json({ message: 'Department already exists.' }); await Department.create({ name: req.body.name.trim() }); res.status(201).json({ success: true, message: 'Department added successfully!' }); } catch (error) { handleError(res, error); } });
 app.delete('/api/departments/:name', authenticateToken, async (req, res) => { if (req.user.role !== 'Admin') return res.status(403).json({ message: 'Access Denied: Only administrators can delete departments.' }); try { await Department.deleteOne({ name: req.params.name }); res.json({ success: true, message: 'Department deleted successfully!' }); } catch (error) { handleError(res, error); } });
 
-app.get('/api/assets', async (req, res) => { try { res.json(cleanMany(await Asset.find().lean())); } catch (error) { handleError(res, error); } });
+app.get('/api/assets', authenticateToken, async (req, res) => { try { res.json(cleanMany(await Asset.find().lean())); } catch (error) { handleError(res, error); } });
 app.post('/api/assets', authenticateToken, async (req, res) => { try { const id = await nextId('assets', 'AST-'); const asset = await Asset.create({ ...req.body, id, status: req.body.status || 'Active', owner: req.body.owner || null }); res.status(201).json({ success: true, asset: clean(asset) }); } catch (error) { handleError(res, error); } });
 app.put('/api/assets/:id', authenticateToken, async (req, res) => { try { const asset = await Asset.findOneAndUpdate({ id: req.params.id }, { $set: { ...req.body, id: req.params.id } }, { new: true, runValidators: true }); if (!asset) return res.status(404).json({ message: 'Asset not found.' }); res.json({ success: true, message: 'Asset updated successfully!' }); } catch (error) { handleError(res, error); } });
 app.delete('/api/assets/:id', authenticateToken, async (req, res) => { try { await Asset.deleteOne({ id: req.params.id }); res.json({ success: true, message: 'Asset deleted successfully!' }); } catch (error) { handleError(res, error); } });
 app.post('/api/assets/:id/return', authenticateToken, async (req, res) => { try { const asset = await Asset.findOne({ id: req.params.id }); if (!asset) return res.status(404).json({ message: 'Asset not found.' }); await Asset.updateOne({ id: req.params.id }, { $set: { owner: asset.department || null, status: 'Active' } }); await Allocation.updateMany({ assetId: req.params.id, status: 'Approved' }, { $set: { status: 'Returned' } }); res.json({ success: true, message: 'Asset returned to department stock successfully!' }); } catch (error) { handleError(res, error); } });
 
-app.get('/api/allocations', async (req, res) => { try { res.json(cleanMany(await Allocation.find().lean())); } catch (error) { handleError(res, error); } });
+app.get('/api/allocations', authenticateToken, async (req, res) => { try { res.json(cleanMany(await Allocation.find().lean())); } catch (error) { handleError(res, error); } });
 app.post('/api/allocations', authenticateToken, async (req, res) => {
     try {
         const userName = req.user.name || req.user.email;
@@ -157,29 +167,29 @@ app.post('/api/allocations/:id/action', authenticateToken, async (req, res) => {
 
 app.get('/api/bookings', authenticateToken, async (req, res) => { try { res.json(cleanMany(await Booking.find().lean())); } catch (error) { handleError(res, error); } });
 app.post('/api/bookings', authenticateToken, async (req, res) => {
-    const { resourceName, bookedBy, date, startTime, endTime, department } = req.body;
+    const { resourceName, date, startTime, endTime } = req.body;
     if (!resourceName || !date || !startTime || !endTime || startTime >= endTime) return res.status(400).json({ message: 'A valid resource, date, and time range are required.' });
     try {
         const conflict = await Booking.findOne({ resourceName, date, status: { $ne: 'Cancelled' }, startTime: { $lt: endTime }, endTime: { $gt: startTime } }).lean();
         if (conflict) return res.status(409).json({ message: `Resource "${resourceName}" is already booked for the selected time slot.` });
-        await Booking.create({ id: await nextId('bookings', 'BKG-'), resourceName, bookedBy: bookedBy || req.user.name || req.user.email, date, startTime, endTime, status: 'Confirmed', department: department || req.user.department || 'IT' });
+        await Booking.create({ id: await nextId('bookings', 'BKG-'), resourceName, bookedBy: req.user.name || req.user.email, date, startTime, endTime, status: 'Confirmed', department: req.user.department || 'IT' });
         await createNotification({ title: 'Booking Confirmed', message: `Your booking for ${resourceName} on ${date} (${startTime}-${endTime}) is confirmed.`, type: 'success', targetUserEmail: req.user.email });
         res.status(201).json({ success: true, message: 'Resource booked successfully!' });
     } catch (error) { handleError(res, error); }
 });
-app.delete('/api/bookings/:id', authenticateToken, async (req, res) => { try { await Booking.updateOne({ id: req.params.id }, { $set: { status: 'Cancelled' } }); res.json({ success: true, message: 'Booking cancelled successfully!' }); } catch (error) { handleError(res, error); } });
+app.delete('/api/bookings/:id', authenticateToken, async (req, res) => { try { const booking = await Booking.findOne({ id: req.params.id }); if (!booking) return res.status(404).json({ message: 'Booking not found.' }); const canCancel = normalizeRole(req.user.role) === 'admin' || normalizeRole(req.user.role) === 'assetmanager' || booking.bookedBy === req.user.name || booking.bookedBy === req.user.email; if (!canCancel) return res.status(403).json({ message: 'You can only cancel your own bookings.' }); await booking.updateOne({ $set: { status: 'Cancelled' } }); res.json({ success: true, message: 'Booking cancelled successfully!' }); } catch (error) { handleError(res, error); } });
 
-app.get('/api/maintenance', async (req, res) => { try { res.json(cleanMany(await Maintenance.find().lean())); } catch (error) { handleError(res, error); } });
+app.get('/api/maintenance', authenticateToken, async (req, res) => { try { res.json(cleanMany(await Maintenance.find().lean())); } catch (error) { handleError(res, error); } });
 app.post('/api/maintenance', authenticateToken, async (req, res) => { try { await Maintenance.create({ ...req.body, id: await nextId('maintenance', 'MNT-'), status: 'Pending' }); await Asset.updateOne({ id: req.body.assetId }, { $set: { status: 'Maintenance' } }); res.status(201).json({ success: true, message: 'Maintenance log added successfully!' }); } catch (error) { handleError(res, error); } });
 app.put('/api/maintenance/:id/status', authenticateToken, async (req, res) => { try { const log = await Maintenance.findOneAndUpdate({ id: req.params.id }, { $set: { status: req.body.status, ...(req.body.cost !== undefined ? { cost: req.body.cost } : {}) } }, { new: true }); if (!log) return res.status(404).json({ message: 'Maintenance record not found.' }); if (['Resolved', 'Completed', 'Rejected', 'Cancelled'].includes(req.body.status)) await Asset.updateOne({ id: log.assetId }, { $set: { status: 'Active' } }); res.json({ success: true, message: 'Maintenance status updated!' }); } catch (error) { handleError(res, error); } });
 
-app.get('/api/audits', async (req, res) => { try { res.json(cleanMany(await Audit.find().lean())); } catch (error) { handleError(res, error); } });
+app.get('/api/audits', authenticateToken, async (req, res) => { try { res.json(cleanMany(await Audit.find().lean())); } catch (error) { handleError(res, error); } });
 app.post('/api/audits', authenticateToken, async (req, res) => { try { await Audit.create({ ...req.body, id: await nextId('audits', 'AUD-'), progress: 0, status: 'In Progress' }); res.status(201).json({ success: true, message: 'Audit scheduled successfully!' }); } catch (error) { handleError(res, error); } });
 app.put('/api/audits/:id/progress', authenticateToken, async (req, res) => { try { await Audit.updateOne({ id: req.params.id }, { $set: { progress: req.body.progress, status: req.body.progress === 100 ? 'Completed' : 'In Progress' } }); res.json({ success: true, message: 'Audit progress updated!' }); } catch (error) { handleError(res, error); } });
 app.get('/api/audits/:id/state', authenticateToken, async (req, res) => { try { const audit = await Audit.findOne({ id: req.params.id }).lean(); if (!audit) return res.status(404).json({ message: 'Audit not found.' }); res.json({ state: audit.assetState || null }); } catch (error) { handleError(res, error); } });
 app.put('/api/audits/:id/state', authenticateToken, async (req, res) => { try { await Audit.updateOne({ id: req.params.id }, { $set: { assetState: req.body.state || null } }); res.json({ success: true, message: 'Audit state saved!' }); } catch (error) { handleError(res, error); } });
 
-app.get('/api/reports/analytics', async (req, res) => { try { const [assets, maintenance, bookings, allocations] = await Promise.all([Asset.find().lean(), Maintenance.find().lean(), Booking.find().lean(), Allocation.find().lean()]); const deptDistribution = {}; const statusDistribution = {}; assets.forEach((asset) => { const dept = asset.department || 'Unassigned'; const status = asset.status || 'Active'; deptDistribution[dept] = (deptDistribution[dept] || 0) + 1; statusDistribution[status] = (statusDistribution[status] || 0) + 1; }); const usage = {}; bookings.filter((b) => b.status === 'Confirmed').forEach((b) => { usage[b.resourceName] = (usage[b.resourceName] || 0) + 1; }); allocations.forEach((a) => { if (a.assetName) usage[a.assetName] = (usage[a.assetName] || 0) + 1; }); const mostUsedList = Object.entries(usage).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count).slice(0, 5); const idleList = assets.filter((a) => !a.owner && a.status !== 'Disposed').slice(0, 5).map((a) => ({ id: a.id, name: a.name, location: a.location || 'Central Stock' })); res.json({ totalValuation: assets.reduce((sum, a) => sum + (Number(a.value) || 0), 0), totalMaintenanceCost: maintenance.reduce((sum, m) => sum + (Number(m.cost) || 0), 0), totalAssetsCount: assets.length, deptDistribution, statusDistribution, mostUsedList, idleList }); } catch (error) { handleError(res, error); } });
+app.get('/api/reports/analytics', authenticateToken, async (req, res) => { try { const [assets, maintenance, bookings, allocations] = await Promise.all([Asset.find().lean(), Maintenance.find().lean(), Booking.find().lean(), Allocation.find().lean()]); const deptDistribution = {}; const statusDistribution = {}; assets.forEach((asset) => { const dept = asset.department || 'Unassigned'; const status = asset.status || 'Active'; deptDistribution[dept] = (deptDistribution[dept] || 0) + 1; statusDistribution[status] = (statusDistribution[status] || 0) + 1; }); const usage = {}; bookings.filter((b) => b.status === 'Confirmed').forEach((b) => { usage[b.resourceName] = (usage[b.resourceName] || 0) + 1; }); allocations.forEach((a) => { if (a.assetName) usage[a.assetName] = (usage[a.assetName] || 0) + 1; }); const mostUsedList = Object.entries(usage).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count).slice(0, 5); const idleList = assets.filter((a) => !a.owner && a.status !== 'Disposed').slice(0, 5).map((a) => ({ id: a.id, name: a.name, location: a.location || 'Central Stock' })); res.json({ totalValuation: assets.reduce((sum, a) => sum + (Number(a.value) || 0), 0), totalMaintenanceCost: maintenance.reduce((sum, m) => sum + (Number(m.cost) || 0), 0), totalAssetsCount: assets.length, deptDistribution, statusDistribution, mostUsedList, idleList }); } catch (error) { handleError(res, error); } });
 
 app.get('/api/notifications', authenticateToken, async (req, res) => { try { res.json(cleanMany(await Notification.find({ $or: [{ targetRole: null, targetUserEmail: null }, { targetRole: req.user.role }, { targetUserEmail: req.user.email }] }).sort({ date: -1 }).lean())); } catch (error) { handleError(res, error); } });
 app.post('/api/notifications', authenticateToken, async (req, res) => { if (!['Admin', 'Asset Manager'].includes(req.user.role)) return res.status(403).json({ message: 'Access Denied: Only Admins or Asset Managers can send notifications.' }); if (!req.body.title || !req.body.message) return res.status(400).json({ message: 'Title and message are required.' }); try { await createNotification(req.body); res.status(201).json({ success: true, message: 'Notification sent successfully!' }); } catch (error) { handleError(res, error); } });

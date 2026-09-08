@@ -576,6 +576,11 @@ footer {
   .navbar-toggler-custom {
     display: block !important;
   }
+
+  .top-navbar .navbar-actions,
+  .top-navbar .user-menu {
+    gap: 0.5rem;
+  }
 }
 
 .navbar-toggler-custom {
@@ -585,6 +590,40 @@ footer {
   font-size: 1.5rem;
   color: var(--text-color);
   cursor: pointer;
+}
+
+@media (max-width: 575.98px) {
+  .auth-wrapper {
+    padding: 1rem;
+  }
+
+  .auth-card {
+    padding: 1.25rem;
+  }
+
+  .main-content {
+    padding: 1rem !important;
+  }
+
+  .table-custom-wrapper {
+    border-radius: var(--border-radius-sm);
+  }
+
+  .table-custom th,
+  .table-custom td {
+    padding: 0.65rem;
+    white-space: nowrap;
+    font-size: 0.85rem;
+  }
+
+  .otp-input-container {
+    gap: 0.3rem;
+  }
+
+  .otp-digit {
+    width: 42px;
+    height: 46px;
+  }
 }
 
 /* OTP Digits input formatting */

@@ -187,7 +187,7 @@ function setupLoginForm() {
       }).then(async (result) => {
         if (result.isConfirmed) {
           try {
-            await axios.post('http://localhost:3000/api/dev/reset-db');
+            await ApiService.auth.devReset();
             Swal.fire(
               'Reset Complete',
               'The database has been wiped and the Admin account was seeded. Reloading...',

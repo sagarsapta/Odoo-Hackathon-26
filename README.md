@@ -2,7 +2,7 @@
 
 AssetFlow is a responsive, full-stack enterprise resource planning (ERP) system designed for operations teams to track hardware inventory, manage software licenses, schedule audits, coordinate resource bookings (such as conference rooms and company vehicles), and log maintenance records.
 
-It features a modern, premium design built using standard HTML5/CSS3/JS, styled with **Bootstrap 5**, and connected to a robust **Node.js/Express** backend backed by a fully persistent **MySQL** database.
+It features a modern, premium design built using standard HTML5/CSS3/JS, styled with **Bootstrap 5**, and connected to a robust **Node.js/Express** backend backed by a fully persistent **MongoDB** database through Mongoose.
 
 ---
 
@@ -11,7 +11,7 @@ It features a modern, premium design built using standard HTML5/CSS3/JS, styled 
 1. **Role-Based Access Control (RBAC)**:
    - Customized dashboards, navigation, and permissions for **Admins**, **Asset Managers**, **Department Heads**, and **Employees**.
 2. **Enterprise Persistent Data Architecture**:
-   - 100% data persistence using MySQL. All application state, from user accounts to verification logs, is securely stored.
+   - 100% data persistence using MongoDB. All application state, from user accounts to verification logs, is securely stored.
    - Dynamic empty states replace hardcoded mock data for a clean, production-ready experience.
 3. **Advanced User & Organization Management**:
    - Admins can register new users (Asset Managers, Dept Heads, Employees) directly from the dashboard.
@@ -34,7 +34,7 @@ It features a modern, premium design built using standard HTML5/CSS3/JS, styled 
 
 - **Frontend**: HTML5, CSS3, Vanilla JavaScript (ES6+), Bootstrap 5, Axios, SweetAlert2, FullCalendar
 - **Backend**: Node.js, Express.js, JSON Web Tokens (JWT)
-- **Database**: MySQL (with automated table creation, migration, and seeding)
+- **Database**: MongoDB/Mongoose (with idempotent demo seeding)
 
 ---
 
@@ -67,7 +67,7 @@ It features a modern, premium design built using standard HTML5/CSS3/JS, styled 
 
 ### Prerequisites
 - [Node.js](https://nodejs.org/) installed.
-- [MySQL Server](https://www.mysql.com/) installed and running locally.
+- MongoDB Atlas or MongoDB Community Server available.
 
 ### 1. Configure Backend Environment
 Navigate to the backend directory and configure the environment variables:
@@ -77,13 +77,13 @@ cd assetflow/backend
 Create or edit the `.env` file (you can use `.env-example` as a template):
 ```env
 PORT=3000
-DB_HOST=localhost
-DB_USER=root
-DB_PASSWORD=YOUR_MYSQL_PASSWORD
-DB_NAME=assetflow_db
-JWT_SECRET=assetflow_super_secret_key_123!
+MONGODB_URI=mongodb://127.0.0.1:27017/assetflow_db
+JWT_SECRET=replace_with_a_long_random_secret
+DEFAULT_ADMIN_EMAIL=admin@assetflow.com
+DEFAULT_ADMIN_PASSWORD=replace_with_a_strong_password
+NODE_ENV=development
 ```
-*Make sure your MySQL server is running and the credentials match.*
+*Use your MongoDB Atlas connection string for `MONGODB_URI` in hosted environments. Never commit `.env`.*
 
 ### 2. Run the Backend Server
 Install dependencies and start the server:
@@ -91,7 +91,7 @@ Install dependencies and start the server:
 npm install
 npm start
 ```
-*Note: Upon startup, the server will automatically connect to MySQL, create the `assetflow_db` database, initialize the tables for persistence, and seed them with required default master data.*
+*Note: Upon startup, the server connects to MongoDB, creates collections on first use, and idempotently seeds demo data without deleting existing records.*
 
 ### 3. Open the Frontend
 Since the frontend consists of static HTML/JS/CSS files, you can open `assetflow/frontend/index.html` directly in your browser, or use a local HTTP server such as VS Code's **Live Server** extension for the best experience.
@@ -100,7 +100,7 @@ Since the frontend consists of static HTML/JS/CSS files, you can open `assetflow
 
 ## 🔑 Default Credentials
 
-Upon initialization, only the default **Admin** account is seeded into the database. All other users (Asset Managers, Department Heads, Employees) must be securely registered by the Admin via the Organization Setup dashboard.
+The development seed creates demo accounts for Admin, Asset Manager, Department Heads, and Employees. All demo accounts use `Password123!`; existing users are never overwritten.
 
 | User Role | Email | Password | Access Scope |
 | :--- | :--- | :--- | :--- |
@@ -109,4 +109,4 @@ Upon initialization, only the default **Admin** account is seeded into the datab
 ---
 
 ## 🛡️ Database Reset & Cleanup
-For development and demonstration purposes, if you need to wipe all data and return to a clean state, an Admin user can use the **Reset Database** functionality located within the Admin Settings / Org Setup page. This will drop all tables and re-seed the default data cleanly.
+For development and demonstration purposes, set `ENABLE_DEV_RESET=true` and use the reset endpoint only with an Admin JWT. It clears application collections and re-seeds demo data; it is disabled unless explicitly enabled and never runs during normal startup.
