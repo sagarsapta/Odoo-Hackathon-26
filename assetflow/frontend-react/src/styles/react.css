@@ -1,9 +1,175 @@
-/* React migration compatibility styles. The original design system remains the source of truth. */
-.navbar-toggler-custom { border: 0; background: transparent; color: var(--text-color); font-size: 1.15rem; }
-.sidebar-link.active { background-color: var(--sidebar-active); color: var(--sidebar-active-text); font-weight: 600; }
-.sidebar-link.active i { color: var(--sidebar-active-text); }
-.btn-icon { width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; }
-.modal-backdrop-react { position: fixed; inset: 0; z-index: 1050; background: rgba(15, 23, 42, .45); display: flex; align-items: center; justify-content: center; padding: 1rem; }
-.modal-backdrop-react .modal-content { max-height: calc(100vh - 2rem); overflow: auto; }
-.react-form-error { min-height: 1.25rem; }
-@media (max-width: 991.98px) { .sidebar { transform: translateX(-100%); } .sidebar.active { transform: translateX(0); } .main-content { margin-left: 0; max-width: 100%; } }
+/* AssetFlow React Enhanced Styles - Preserves original design system while adding component polish */
+
+.navbar-toggler-custom {
+  border: 0;
+  background: transparent;
+  color: var(--text-color);
+  font-size: 1.25rem;
+  cursor: pointer;
+}
+
+.sidebar-link.active {
+  background-color: var(--sidebar-active) !important;
+  color: var(--sidebar-active-text) !important;
+  font-weight: 600;
+}
+
+.sidebar-link.active i {
+  color: var(--sidebar-active-text) !important;
+}
+
+.btn-icon {
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-backdrop-react {
+  position: fixed;
+  inset: 0;
+  z-index: 1050;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  overflow-y: auto;
+}
+
+.modal-backdrop-react .modal-content {
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+}
+
+.cursor-pointer {
+  cursor: pointer;
+}
+
+/* Kanban Board Styling */
+.kanban-board {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.25rem;
+}
+
+.kanban-column {
+  background-color: var(--sidebar-hover);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  padding: 1rem;
+  min-height: 480px;
+  display: flex;
+  flex-direction: column;
+}
+
+.kanban-column-header {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text-color);
+  padding-bottom: 0.75rem;
+  margin-bottom: 1rem;
+  border-bottom: 2px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.kanban-card {
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+  transition: var(--transition);
+  box-shadow: var(--shadow-sm);
+}
+
+.kanban-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.kanban-card.resolved-card {
+  border-left: 4px solid #10b981;
+}
+
+.kanban-card.pending-card {
+  border-left: 4px solid #f59e0b;
+}
+
+.kanban-card.progress-card {
+  border-left: 4px solid #3b82f6;
+}
+
+/* Booking Visual Time Slot Grid */
+.time-slot-btn {
+  padding: 0.35rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  transition: var(--transition);
+}
+
+.time-slot-btn.available {
+  background-color: var(--card-bg);
+  color: var(--text-color);
+}
+
+.time-slot-btn.available:hover {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+  background-color: var(--sidebar-active);
+}
+
+.time-slot-btn.booked {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.3);
+  text-decoration: line-through;
+  cursor: not-allowed;
+}
+
+.time-slot-btn.selected {
+  background-color: var(--primary-color);
+  color: #ffffff;
+  border-color: var(--primary-color);
+}
+
+/* Tab Navigation Pills */
+.nav-pills-custom .nav-link {
+  border: 1px solid var(--border-color) !important;
+  background-color: var(--card-bg);
+  color: var(--text-color);
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 0.5rem 1rem;
+  border-radius: var(--border-radius-sm);
+  transition: all 0.2s ease-in-out;
+}
+
+.nav-pills-custom .nav-link.active {
+  background-color: var(--primary-color) !important;
+  border-color: var(--primary-color) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.25);
+}
+
+/* Responsive Overrides */
+@media (max-width: 991.98px) {
+  .sidebar {
+    transform: translateX(-100%);
+  }
+
+  .sidebar.active {
+    transform: translateX(0);
+  }
+
+  .main-content {
+    margin-left: 0 !important;
+    max-width: 100% !important;
+  }
+}
