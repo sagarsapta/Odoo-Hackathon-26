@@ -455,7 +455,7 @@ This section describes the responsibility and implementation boundary of every m
     "success": true,
     "token": "<jwt>",
     "user": {
-        "email": "admin@assetflow.com",
+        "email": "6",
         "name": "Rahul Sharma",
         "role": "Admin",
         "department": "Administration",

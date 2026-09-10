@@ -1,0 +1,9 @@
+/* React migration compatibility styles. The original design system remains the source of truth. */
+.navbar-toggler-custom { border: 0; background: transparent; color: var(--text-color); font-size: 1.15rem; }
+.sidebar-link.active { background-color: var(--sidebar-active); color: var(--sidebar-active-text); font-weight: 600; }
+.sidebar-link.active i { color: var(--sidebar-active-text); }
+.btn-icon { width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; }
+.modal-backdrop-react { position: fixed; inset: 0; z-index: 1050; background: rgba(15, 23, 42, .45); display: flex; align-items: center; justify-content: center; padding: 1rem; }
+.modal-backdrop-react .modal-content { max-height: calc(100vh - 2rem); overflow: auto; }
+.react-form-error { min-height: 1.25rem; }
+@media (max-width: 991.98px) { .sidebar { transform: translateX(-100%); } .sidebar.active { transform: translateX(0); } .main-content { margin-left: 0; max-width: 100%; } }
