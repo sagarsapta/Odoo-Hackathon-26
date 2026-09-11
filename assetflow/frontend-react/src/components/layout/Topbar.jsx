@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { dataService } from '../../services/dataService';
-import { DataBadge } from '../ui/DataBadge';
 
 function getUserInitials(name) {
   if (!name) return 'U';
@@ -93,9 +92,6 @@ export function Topbar({ title, onToggleSidebar }) {
             style={{ left: 15, top: 12 }}
           ></i>
         </div>
-
-        {/* Live / Demo Mode Badge */}
-        <DataBadge />
 
         {/* Dark Mode Toggle */}
         <button

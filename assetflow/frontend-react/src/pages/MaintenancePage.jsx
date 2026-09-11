@@ -8,6 +8,7 @@ import { StatusBadge } from '../components/ui/StatusBadge';
 import { DataTable } from '../components/ui/DataTable';
 import { Modal } from '../components/ui/Modal';
 import { SkeletonCards, SkeletonLoader } from '../components/ui/SkeletonLoader';
+import { normalizeMaintenance, formatCurrency } from '../services/normalizers';
 
 export function MaintenancePage() {
   const { user } = useAuth();
@@ -38,8 +39,8 @@ export function MaintenancePage() {
         dataService.maintenance.list(),
         dataService.assets.list()
       ]);
-      setMaintenance(mList);
-      setAssets(aList);
+      setMaintenance(Array.isArray(mList) ? mList.map(normalizeMaintenance) : []);
+      setAssets(Array.isArray(aList) ? aList : []);
       if (aList.length > 0 && !form.assetId) {
         setForm((prev) => ({ ...prev, assetId: aList[0].id }));
       }

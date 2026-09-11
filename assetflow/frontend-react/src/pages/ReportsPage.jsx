@@ -13,6 +13,7 @@ import {
 import { dataService } from '../services/dataService';
 import { PageContainer } from '../components/layout/AppLayout';
 import { SkeletonCards } from '../components/ui/SkeletonLoader';
+import { formatCurrency } from '../services/normalizers';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend);
 
@@ -127,7 +128,7 @@ export function ReportsPage() {
                   <span className="text-muted fs-7 fw-semibold text-uppercase">Total Assets Registered</span>
                   <h3 className="fw-bold my-1 text-success">{analytics.totalAssetsCount}</h3>
                   <small className="text-muted">
-                    Total Valuation: <strong>₹{Number(analytics.totalValuation || 0).toLocaleString('en-IN')}</strong>
+                    Total Valuation: <strong>{formatCurrency(analytics.totalValuation)}</strong>
                   </small>
                 </div>
                 <div className="stat-icon bg-success-subtle text-success">
@@ -143,7 +144,7 @@ export function ReportsPage() {
                 <div>
                   <span className="text-muted fs-7 fw-semibold text-uppercase">Maintenance Expenses</span>
                   <h3 className="fw-bold my-1 text-danger">
-                    ₹{Number(analytics.totalMaintenanceCost || 0).toLocaleString('en-IN')}
+                    {formatCurrency(analytics.totalMaintenanceCost)}
                   </h3>
                   <small className="text-muted">Total repair & servicing expenditure</small>
                 </div>

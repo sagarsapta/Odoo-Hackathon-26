@@ -11,6 +11,47 @@ function getUserInitials(name) {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
+/**
+ * Validates Indian phone number format.
+ * Accepts: +91 XXXXX XXXXX, +91XXXXXXXXXX, 91XXXXXXXXXX, 0XXXXXXXXXX, XXXXXXXXXX
+ * Returns { valid: boolean, message: string }
+ */
+function validatePhone(phone) {
+  if (!phone || !phone.trim()) {
+    return { valid: true, message: '' }; // Phone is optional
+  }
+  // Strip all spaces, dashes, parens
+  const cleaned = phone.replace(/[\s\-()]/g, '');
+
+  // Check for Indian format: +91XXXXXXXXXX or 91XXXXXXXXXX or 0XXXXXXXXXX or just 10 digits
+  const indianRegex = /^(\+91|91|0)?[6-9]\d{9}$/;
+  if (!indianRegex.test(cleaned)) {
+    return {
+      valid: false,
+      message: 'Enter a valid Indian phone number (e.g. +91 98765 43210). Must start with 6-9 and be 10 digits.'
+    };
+  }
+  return { valid: true, message: '' };
+}
+
+/**
+ * Formats a phone number to standard Indian display: +91 XXXXX XXXXX
+ */
+function formatPhoneDisplay(phone) {
+  if (!phone) return '';
+  const cleaned = phone.replace(/[\s\-()]/g, '');
+  // Extract last 10 digits
+  let digits = cleaned;
+  if (digits.startsWith('+91')) digits = digits.slice(3);
+  else if (digits.startsWith('91') && digits.length > 10) digits = digits.slice(2);
+  else if (digits.startsWith('0') && digits.length === 11) digits = digits.slice(1);
+
+  if (digits.length === 10) {
+    return `+91 ${digits.slice(0, 5)} ${digits.slice(5)}`;
+  }
+  return phone; // Return as-is if can't format
+}
+
 export function ProfilePage() {
   const { user, updateUser } = useAuth();
   const fileInputRef = useRef(null);
@@ -27,6 +68,11 @@ export function ProfilePage() {
     avatar: user?.avatar || ''
   });
 
+  // Validation error states
+  const [phoneError, setPhoneError] = useState('');
+  const [phoneTouched, setPhoneTouched] = useState(false);
+  const [nameError, setNameError] = useState('');
+
   // Password form state
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
@@ -41,6 +87,41 @@ export function ProfilePage() {
 
   const [busyDetails, setBusyDetails] = useState(false);
   const [busyPassword, setBusyPassword] = useState(false);
+
+  // Phone change handler with real-time validation
+  const handlePhoneChange = (e) => {
+    const value = e.target.value;
+    setProfileForm({ ...profileForm, phone: value });
+    if (phoneTouched) {
+      const result = validatePhone(value);
+      setPhoneError(result.valid ? '' : result.message);
+    }
+  };
+
+  const handlePhoneBlur = () => {
+    setPhoneTouched(true);
+    const result = validatePhone(profileForm.phone);
+    setPhoneError(result.valid ? '' : result.message);
+
+    // Auto-format if valid
+    if (result.valid && profileForm.phone.trim()) {
+      const formatted = formatPhoneDisplay(profileForm.phone);
+      setProfileForm((prev) => ({ ...prev, phone: formatted }));
+    }
+  };
+
+  // Name change handler with validation
+  const handleNameChange = (e) => {
+    const value = e.target.value;
+    setProfileForm({ ...profileForm, fullName: value });
+    if (!value.trim()) {
+      setNameError('Full name is required.');
+    } else if (value.trim().length < 2) {
+      setNameError('Name must be at least 2 characters.');
+    } else {
+      setNameError('');
+    }
+  };
 
   // Avatar Upload with FileReader
   const handleAvatarFileChange = (e) => {
@@ -76,19 +157,39 @@ export function ProfilePage() {
     reader.readAsDataURL(file);
   };
 
-  // Save Profile Details
+  // Save Profile Details with validation
   const handleDetailsSubmit = async (e) => {
     e.preventDefault();
-    if (!profileForm.fullName) {
+
+    // Validate full name
+    if (!profileForm.fullName || !profileForm.fullName.trim()) {
+      setNameError('Full name is required.');
       return Swal.fire('Error', 'Full name is required.', 'warning');
+    }
+    if (profileForm.fullName.trim().length < 2) {
+      setNameError('Name must be at least 2 characters.');
+      return Swal.fire('Error', 'Name must be at least 2 characters.', 'warning');
+    }
+
+    // Validate phone
+    const phoneResult = validatePhone(profileForm.phone);
+    if (!phoneResult.valid) {
+      setPhoneError(phoneResult.message);
+      setPhoneTouched(true);
+      return Swal.fire('Invalid Phone', phoneResult.message, 'warning');
     }
 
     setBusyDetails(true);
     try {
+      // Format phone before saving
+      const formattedPhone = profileForm.phone.trim()
+        ? formatPhoneDisplay(profileForm.phone)
+        : '';
+
       const res = await dataService.profile.update({
-        fullName: profileForm.fullName,
+        fullName: profileForm.fullName.trim(),
         department: profileForm.department,
-        phone: profileForm.phone,
+        phone: formattedPhone,
         jobTitle: profileForm.jobTitle,
         avatar: profileForm.avatar
       });
@@ -116,11 +217,11 @@ export function ProfilePage() {
     if (!passwordForm.currentPassword) {
       return Swal.fire('Required', 'Please enter your current password.', 'warning');
     }
-    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      return Swal.fire('Mismatch', 'New passwords do not match.', 'warning');
-    }
     if (passwordForm.newPassword.length < 8) {
       return Swal.fire('Weak Password', 'New password must be at least 8 characters.', 'warning');
+    }
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      return Swal.fire('Mismatch', 'New passwords do not match.', 'warning');
     }
 
     setBusyPassword(true);
@@ -142,6 +243,24 @@ export function ProfilePage() {
 
   const displayName = profileForm.fullName || user?.fullName || user?.name || 'User';
   const role = user?.role || 'Employee';
+
+  // Password strength indicator
+  const getPasswordStrength = (pwd) => {
+    if (!pwd) return { level: 0, label: '', color: '' };
+    let score = 0;
+    if (pwd.length >= 8) score++;
+    if (pwd.length >= 12) score++;
+    if (/[A-Z]/.test(pwd)) score++;
+    if (/[0-9]/.test(pwd)) score++;
+    if (/[^A-Za-z0-9]/.test(pwd)) score++;
+
+    if (score <= 1) return { level: 1, label: 'Weak', color: '#EF4444' };
+    if (score <= 2) return { level: 2, label: 'Fair', color: '#F59E0B' };
+    if (score <= 3) return { level: 3, label: 'Good', color: '#3B82F6' };
+    return { level: 4, label: 'Strong', color: '#10B981' };
+  };
+
+  const pwdStrength = getPasswordStrength(passwordForm.newPassword);
 
   return (
     <PageContainer
@@ -202,10 +321,15 @@ export function ProfilePage() {
             <h4 className="fw-bold mb-1" style={{ color: 'var(--text-color)' }}>
               {displayName}
             </h4>
-            <p className="text-muted small mb-3">{role}</p>
-            <div className="badge bg-primary-subtle text-primary rounded-pill px-3 py-1.5 fs-8">
-              {profileForm.email}
+            <p className="text-muted small mb-2">{role}</p>
+            <div className="badge bg-primary-subtle text-primary rounded-pill px-3 py-1 mb-2" style={{ fontSize: '0.78rem' }}>
+              <i className="fa-solid fa-envelope me-1"></i>{profileForm.email}
             </div>
+            {profileForm.phone && validatePhone(profileForm.phone).valid && (
+              <div className="badge bg-success-subtle text-success rounded-pill px-3 py-1 d-block mx-auto" style={{ fontSize: '0.78rem', maxWidth: 220 }}>
+                <i className="fa-solid fa-phone me-1"></i>{profileForm.phone}
+              </div>
+            )}
           </div>
         </div>
 
@@ -252,7 +376,7 @@ export function ProfilePage() {
             <div className="p-4">
               {/* Tab 1: My Details */}
               {activeTab === 'details' && (
-                <form onSubmit={handleDetailsSubmit}>
+                <form onSubmit={handleDetailsSubmit} noValidate>
                   <div className="row g-3">
                     <div className="col-md-6">
                       <label className="form-label-custom">
@@ -260,11 +384,16 @@ export function ProfilePage() {
                       </label>
                       <input
                         type="text"
-                        className="form-control form-control-custom"
+                        className={`form-control form-control-custom ${nameError ? 'is-invalid' : ''}`}
                         value={profileForm.fullName}
-                        onChange={(e) => setProfileForm({ ...profileForm, fullName: e.target.value })}
+                        onChange={handleNameChange}
                         required
                       />
+                      {nameError && (
+                        <div className="invalid-feedback d-block" style={{ fontSize: '0.8rem' }}>
+                          <i className="fa-solid fa-circle-exclamation me-1"></i>{nameError}
+                        </div>
+                      )}
                     </div>
 
                     <div className="col-md-6">
@@ -279,17 +408,45 @@ export function ProfilePage() {
                         disabled
                         style={{ opacity: 0.85 }}
                       />
+                      <small className="text-muted" style={{ fontSize: '0.75rem' }}>
+                        <i className="fa-solid fa-lock me-1"></i>Email cannot be changed
+                      </small>
                     </div>
 
                     <div className="col-md-6">
-                      <label className="form-label-custom">Phone Number</label>
-                      <input
-                        type="tel"
-                        className="form-control form-control-custom"
-                        placeholder="+1 (555) 000-0000"
-                        value={profileForm.phone}
-                        onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
-                      />
+                      <label className="form-label-custom">
+                        Phone Number
+                        <span className="text-muted ms-1" style={{ fontSize: '0.75rem', fontWeight: 400 }}>
+                          (Indian: +91)
+                        </span>
+                      </label>
+                      <div className="position-relative">
+                        <input
+                          type="tel"
+                          className={`form-control form-control-custom ${phoneError ? 'is-invalid' : (phoneTouched && profileForm.phone.trim() && !phoneError) ? 'is-valid' : ''}`}
+                          placeholder="+91 98765 43210"
+                          value={profileForm.phone}
+                          onChange={handlePhoneChange}
+                          onBlur={handlePhoneBlur}
+                          maxLength={16}
+                        />
+                        {phoneTouched && profileForm.phone.trim() && !phoneError && (
+                          <i
+                            className="fa-solid fa-circle-check text-success position-absolute"
+                            style={{ right: 12, top: '50%', transform: 'translateY(-50%)' }}
+                          ></i>
+                        )}
+                      </div>
+                      {phoneError && (
+                        <div className="invalid-feedback d-block" style={{ fontSize: '0.8rem' }}>
+                          <i className="fa-solid fa-circle-exclamation me-1"></i>{phoneError}
+                        </div>
+                      )}
+                      {!phoneError && (
+                        <small className="text-muted" style={{ fontSize: '0.72rem' }}>
+                          Format: +91 XXXXX XXXXX (10-digit Indian mobile)
+                        </small>
+                      )}
                     </div>
 
                     <div className="col-md-6">
@@ -308,7 +465,7 @@ export function ProfilePage() {
                     <button
                       type="submit"
                       className="btn btn-primary-custom text-white"
-                      disabled={busyDetails}
+                      disabled={busyDetails || !!nameError || !!phoneError}
                     >
                       {busyDetails ? 'Saving...' : 'Save Details'}
                     </button>
@@ -386,6 +543,28 @@ export function ProfilePage() {
                           ></i>
                         </button>
                       </div>
+                      {/* Password Strength Indicator */}
+                      {passwordForm.newPassword && (
+                        <div className="mt-2">
+                          <div className="d-flex gap-1 mb-1">
+                            {[1, 2, 3, 4].map((i) => (
+                              <div
+                                key={i}
+                                style={{
+                                  height: 4,
+                                  flex: 1,
+                                  borderRadius: 2,
+                                  backgroundColor: i <= pwdStrength.level ? pwdStrength.color : '#E2E8F0',
+                                  transition: 'background-color 0.3s ease'
+                                }}
+                              />
+                            ))}
+                          </div>
+                          <small style={{ color: pwdStrength.color, fontSize: '0.75rem', fontWeight: 600 }}>
+                            {pwdStrength.label}
+                          </small>
+                        </div>
+                      )}
                     </div>
 
                     <div className="col-md-6">
@@ -420,6 +599,22 @@ export function ProfilePage() {
                           ></i>
                         </button>
                       </div>
+                      {/* Password match indicator */}
+                      {passwordForm.confirmPassword && (
+                        <small
+                          className="mt-1 d-block"
+                          style={{
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            color: passwordForm.newPassword === passwordForm.confirmPassword ? '#10B981' : '#EF4444'
+                          }}
+                        >
+                          <i className={`fa-solid ${passwordForm.newPassword === passwordForm.confirmPassword ? 'fa-circle-check' : 'fa-circle-xmark'} me-1`}></i>
+                          {passwordForm.newPassword === passwordForm.confirmPassword
+                            ? 'Passwords match'
+                            : 'Passwords do not match'}
+                        </small>
+                      )}
                     </div>
                   </div>
 

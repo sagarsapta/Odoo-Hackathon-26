@@ -12,14 +12,16 @@ export function StatusBadge({ value }) {
     normalized === 'completed' ||
     normalized === 'resolved' ||
     normalized === 'found' ||
-    normalized === 'available'
+    normalized === 'available' ||
+    normalized === 'assigned'
   ) {
     badgeClass = 'bg-success-subtle text-success';
   } else if (
     normalized.includes('pending') ||
     normalized === 'in progress' ||
     normalized === 'maintenance' ||
-    normalized === 'transfer requested'
+    normalized === 'transfer requested' ||
+    normalized === 'scheduled'
   ) {
     badgeClass = 'bg-warning-subtle text-warning';
   } else if (
@@ -28,7 +30,8 @@ export function StatusBadge({ value }) {
     normalized === 'disposed' ||
     normalized === 'missing' ||
     normalized === 'damaged' ||
-    normalized === 'overdue'
+    normalized === 'overdue' ||
+    normalized === 'retired'
   ) {
     badgeClass = 'bg-danger-subtle text-danger';
   } else if (normalized === 'returned') {
@@ -41,3 +44,4 @@ export function StatusBadge({ value }) {
     </span>
   );
 }
+

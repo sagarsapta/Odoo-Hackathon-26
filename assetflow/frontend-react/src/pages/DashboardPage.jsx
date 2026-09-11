@@ -1,69 +1,88 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
-import { Line, Doughnut, Bar } from 'react-chartjs-2';
+import React, { useState, useEffect } from 'react';
+import { NavLink } from 'react-router-dom';
+import { Doughnut, Bar } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
-  PointElement,
-  LineElement,
   BarElement,
   ArcElement,
   Title,
   Tooltip,
-  Legend,
-  Filler
+  Legend
 } from 'chart.js';
-import { useAuth } from '../context/AuthContext';
 import { dataService } from '../services/dataService';
+import { useAuth } from '../context/AuthContext';
 import { PageContainer } from '../components/layout/AppLayout';
-import { StatCard } from '../components/ui/StatCard';
 import { StatusBadge } from '../components/ui/StatusBadge';
-import { SkeletonCards } from '../components/ui/SkeletonLoader';
+import { SkeletonCards, SkeletonLoader } from '../components/ui/SkeletonLoader';
+import {
+  formatCurrency,
+  normalizeAsset,
+  normalizeAllocation,
+  normalizeBooking,
+  normalizeMaintenance,
+  normalizeNotification
+} from '../services/normalizers';
 
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  ArcElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler
-);
+ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend);
 
 export function DashboardPage() {
   const { user } = useAuth();
   const role = user?.role || 'Employee';
-  const userDept = user?.department || 'IT';
-  const userName = user?.fullName || user?.name || 'Rahul Sharma';
+  const userName = user?.fullName || user?.name || 'User';
 
   const [loading, setLoading] = useState(true);
-  const [data, setData] = useState({
-    assets: [],
-    allocations: [],
-    bookings: [],
-    maintenance: [],
-    notifications: [],
-    departments: [],
-    users: []
+  const [analytics, setAnalytics] = useState({
+    totalValuation: 0,
+    totalMaintenanceCost: 0,
+    totalAssetsCount: 0,
+    deptDistribution: {},
+    statusDistribution: {}
   });
 
-  const loadData = async () => {
+  const [recentAssets, setRecentAssets] = useState([]);
+  const [recentAllocations, setRecentAllocations] = useState([]);
+  const [recentBookings, setRecentBookings] = useState([]);
+  const [recentMaintenance, setRecentMaintenance] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+
+  const loadDashboardData = async () => {
     setLoading(true);
     try {
-      const [assets, allocations, bookings, maintenance, notifications, departments, users] = await Promise.all([
-        dataService.assets.list(),
-        dataService.allocations.list(),
-        dataService.bookings.list(),
-        dataService.maintenance.list(),
-        dataService.notifications.list(),
-        dataService.departments.list(),
-        dataService.users.list()
-      ]);
-      setData({ assets, allocations, bookings, maintenance, notifications, departments, users });
+      const [reportsData, assetsData, allocationsData, bookingsData, maintenanceData, notifData] =
+        await Promise.allSettled([
+          dataService.reports.getAnalytics(),
+          dataService.assets.list(),
+          dataService.allocations.list(),
+          dataService.bookings.list(),
+          dataService.maintenance.list(),
+          dataService.notifications.list()
+        ]);
+
+      if (reportsData.status === 'fulfilled') {
+        setAnalytics(reportsData.value);
+      }
+
+      if (assetsData.status === 'fulfilled' && Array.isArray(assetsData.value)) {
+        setRecentAssets(assetsData.value.map(normalizeAsset).slice(0, 5));
+      }
+
+      if (allocationsData.status === 'fulfilled' && Array.isArray(allocationsData.value)) {
+        setRecentAllocations(allocationsData.value.map(normalizeAllocation).slice(0, 5));
+      }
+
+      if (bookingsData.status === 'fulfilled' && Array.isArray(bookingsData.value)) {
+        setRecentBookings(bookingsData.value.map(normalizeBooking).slice(0, 5));
+      }
+
+      if (maintenanceData.status === 'fulfilled' && Array.isArray(maintenanceData.value)) {
+        setRecentMaintenance(maintenanceData.value.map(normalizeMaintenance).slice(0, 5));
+      }
+
+      if (notifData.status === 'fulfilled' && Array.isArray(notifData.value)) {
+        setNotifications(notifData.value.map(normalizeNotification).slice(0, 5));
+      }
     } catch (err) {
       console.warn('Dashboard data fetch error:', err);
     } finally {
@@ -72,150 +91,36 @@ export function DashboardPage() {
   };
 
   useEffect(() => {
-    loadData();
+    loadDashboardData();
   }, []);
 
-  // Filtered views based on RBAC matching original frontend dashboard.js
-  const filteredAssets = useMemo(() => {
-    if (role === 'Department Head' || role === 'DepartmentHead') {
-      const deptLower = (userDept || '').toLowerCase();
-      return data.assets.filter(
-        (a) => (a.department || '').toLowerCase().includes(deptLower) || (a.owner || '').toLowerCase().includes(deptLower)
-      );
-    }
-    if (role === 'Employee') {
-      const nameLower = userName.toLowerCase();
-      return data.assets.filter((a) => (a.owner || '').toLowerCase() === nameLower);
-    }
-    return data.assets;
-  }, [data.assets, role, userDept, userName]);
-
-  const totalValue = useMemo(() => {
-    return filteredAssets.reduce((sum, a) => sum + (Number(a.value) || 0), 0);
-  }, [filteredAssets]);
-
-  // Welcome banner titles
-  const welcomeTitle = useMemo(() => {
-    if (role === 'Department Head' || role === 'DepartmentHead') return `${userDept} Department`;
-    if (role === 'Admin') return 'Dashboard - Admin Portal';
-    return `Dashboard - ${role} Portal`;
-  }, [role, userDept]);
-
-  // Quick action items matching original dashboard.js
-  const quickActions = useMemo(() => {
-    if (role === 'Admin') {
-      return [
-        { label: 'Register Asset', icon: 'fa-plus', link: '/assets', cls: 'btn-primary-custom text-white' },
-        { label: 'Create Department', icon: 'fa-sitemap', link: '/org-setup', cls: 'btn-secondary-custom' },
-        { label: 'Start Audit', icon: 'fa-clipboard-check', link: '/audit', cls: 'btn-secondary-custom' },
-        { label: 'View Reports', icon: 'fa-chart-pie', link: '/reports', cls: 'btn-secondary-custom' }
-      ];
-    }
-    if (role === 'Asset Manager' || role === 'AssetManager') {
-      return [
-        { label: 'Register Asset', icon: 'fa-plus', link: '/assets', cls: 'btn-primary-custom text-white' },
-        { label: 'Allocate Asset', icon: 'fa-right-left', link: '/allocation', cls: 'btn-secondary-custom' },
-        { label: 'Approve Maintenance', icon: 'fa-screwdriver-wrench', link: '/maintenance', cls: 'btn-secondary-custom' },
-        { label: 'Start Audit', icon: 'fa-clipboard-check', link: '/audit', cls: 'btn-secondary-custom' }
-      ];
-    }
-    if (role === 'Department Head' || role === 'DepartmentHead') {
-      return [
-        { label: 'Approve Allocation', icon: 'fa-check-double', link: '/allocation', cls: 'btn-primary-custom text-white' },
-        { label: 'Book Resource', icon: 'fa-calendar-check', link: '/booking', cls: 'btn-secondary-custom' },
-        { label: 'Department Reports', icon: 'fa-chart-pie', link: '/reports', cls: 'btn-secondary-custom' }
-      ];
-    }
-    return [
-      { label: 'Book Resource', icon: 'fa-calendar-plus', link: '/booking', cls: 'btn-primary-custom text-white' },
-      { label: 'Raise Maintenance', icon: 'fa-screwdriver-wrench', link: '/maintenance', cls: 'btn-secondary-custom' },
-      { label: 'Request Asset', icon: 'fa-boxes-stacked', link: '/assets', cls: 'btn-secondary-custom' }
-    ];
-  }, [role]);
-
-  // KPI cards list
-  const kpiCards = useMemo(() => {
-    if (role === 'Admin') {
-      return [
-        { label: 'Total Assets', val: data.assets.length, desc: `₹${totalValue.toLocaleString('en-IN')}`, icon: 'fa-boxes-stacked', bg: 'bg-primary-subtle text-primary' },
-        { label: 'Total Departments', val: data.departments.length || 7, desc: 'Enterprise units', icon: 'fa-sitemap', bg: 'bg-warning-subtle text-warning' },
-        { label: 'Registered Staff', val: data.users.length || 12, desc: 'Active directory accounts', icon: 'fa-users', bg: 'bg-info-subtle text-info' },
-        { label: 'Active Audit Cycles', val: 1, desc: 'Compliance Audit active', icon: 'fa-clipboard-check', bg: 'bg-success-subtle text-success' }
-      ];
-    }
-    if (role === 'Asset Manager' || role === 'AssetManager') {
-      return [
-        { label: 'Available Assets', val: data.assets.filter((a) => a.status === 'Available' || !a.owner).length, desc: 'Ready for allocation', icon: 'fa-circle-check', bg: 'bg-success-subtle text-success' },
-        { label: 'Allocated Assets', val: data.allocations.filter((a) => a.status === 'Approved').length, desc: 'In custody with staff', icon: 'fa-right-left', bg: 'bg-info-subtle text-info' },
-        { label: 'Pending Allocations', val: data.allocations.filter((a) => a.status.includes('Pending')).length, desc: 'Requires approval', icon: 'fa-clock', bg: 'bg-warning-subtle text-warning' },
-        { label: 'Maintenance Requests', val: data.maintenance.filter((m) => m.status === 'Pending').length, desc: 'Unassigned jobs', icon: 'fa-screwdriver-wrench', bg: 'bg-primary-subtle text-primary' }
-      ];
-    }
-    if (role === 'Department Head' || role === 'DepartmentHead') {
-      return [
-        { label: 'Department Assets', val: filteredAssets.length, desc: `${userDept} Department Resources`, icon: 'fa-boxes-stacked', bg: 'bg-primary-subtle text-primary' },
-        { label: 'Pending Approvals', val: data.allocations.filter((a) => a.status.includes('Pending')).length, desc: 'Awaiting your review', icon: 'fa-right-left', bg: 'bg-warning-subtle text-warning' },
-        { label: 'Department Bookings', val: data.bookings.filter((b) => b.status === 'Confirmed').length, desc: 'Active room reservations', icon: 'fa-calendar-check', bg: 'bg-success-subtle text-success' },
-        { label: 'Open Issues', val: data.maintenance.filter((m) => m.status === 'Pending').length, desc: 'Under review', icon: 'fa-screwdriver-wrench', bg: 'bg-danger-subtle text-danger' }
-      ];
-    }
-    return [
-      { label: 'My Assigned Assets', val: filteredAssets.length, desc: 'In your custody', icon: 'fa-user-gear', bg: 'bg-info-subtle text-info' },
-      { label: 'Department Assets', val: data.assets.filter((a) => a.department === userDept).length, desc: `${userDept} pool`, icon: 'fa-boxes-stacked', bg: 'bg-primary-subtle text-primary' },
-      { label: 'Upcoming Bookings', val: data.bookings.filter((b) => b.status === 'Confirmed').length, desc: 'Your active slots', icon: 'fa-calendar-days', bg: 'bg-success-subtle text-success' },
-      { label: 'My Maintenance', val: data.maintenance.filter((m) => m.status === 'Pending').length, desc: 'Reported repairs', icon: 'fa-screwdriver-wrench', bg: 'bg-warning-subtle text-warning' }
-    ];
-  }, [role, data, filteredAssets, totalValue, userDept]);
-
-  // Chart data definitions
   const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
   const textColor = isDark ? '#94A3B8' : '#64748B';
   const gridColor = isDark ? '#334155' : '#E2E8F0';
 
-  const depreciationChartData = {
-    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+  const deptLabels = Object.keys(analytics.deptDistribution || {});
+  const deptValues = Object.values(analytics.deptDistribution || {});
+
+  const deptChartData = {
+    labels: deptLabels.length ? deptLabels : ['IT', 'HR', 'Finance', 'Operations', 'Sales'],
     datasets: [
       {
-        label: 'Asset Initial Value',
-        data: [150000, 180000, 220000, 210000, 250000, totalValue || 450000],
-        borderColor: '#2563EB',
-        backgroundColor: 'rgba(37, 99, 235, 0.08)',
-        fill: true,
-        tension: 0.4
-      },
-      {
-        label: 'Depreciated Value',
-        data: [110000, 130000, 150000, 140000, 160000, Math.round((totalValue || 450000) * 0.72)],
-        borderColor: '#F59E0B',
-        backgroundColor: 'transparent',
-        borderDash: [5, 5],
-        tension: 0.4
+        data: deptValues.length ? deptValues : [24, 12, 15, 18, 10],
+        backgroundColor: ['#2563EB', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#6366F1']
       }
     ]
   };
 
-  const assetTypeMap = {};
-  data.assets.forEach((a) => {
-    assetTypeMap[a.type] = (assetTypeMap[a.type] || 0) + 1;
-  });
+  const statusLabels = Object.keys(analytics.statusDistribution || {});
+  const statusValues = Object.values(analytics.statusDistribution || {});
 
-  const distributionChartData = {
-    labels: Object.keys(assetTypeMap).slice(0, 5),
+  const statusChartData = {
+    labels: statusLabels.length ? statusLabels : ['Active', 'Available', 'Maintenance'],
     datasets: [
       {
-        data: Object.values(assetTypeMap).slice(0, 5),
-        backgroundColor: ['#2563EB', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6']
-      }
-    ]
-  };
-
-  const deptAssetsChartData = {
-    labels: ['Laptops', 'Monitors', 'Networking', 'Printers', 'Accessories'],
-    datasets: [
-      {
-        label: 'Quantity',
-        data: [12, 8, 4, 6, 15],
-        backgroundColor: '#8B5CF6',
+        label: 'Asset Count',
+        data: statusValues.length ? statusValues : [42, 12, 6],
+        backgroundColor: ['#10B981', '#3B82F6', '#F59E0B', '#EF4444'],
         borderRadius: 6
       }
     ]
@@ -223,216 +128,290 @@ export function DashboardPage() {
 
   return (
     <PageContainer
-      title={welcomeTitle}
-      subtitle="Real-time status of enterprise assets & bookings"
+      title={`Welcome back, ${userName}`}
+      subtitle="Enterprise IT Asset & Resource Operations Overview"
       actions={
-        <button className="btn btn-secondary-custom" onClick={loadData}>
-          <i className="fa-solid fa-rotate me-2"></i>Refresh Data
-        </button>
+        <div className="d-flex gap-2">
+          <NavLink to="/assets" className="btn btn-primary-custom text-white btn-sm">
+            <i className="fa-solid fa-boxes-stacked me-1.5"></i>Manage Assets
+          </NavLink>
+          <NavLink to="/reports" className="btn btn-secondary-custom btn-sm">
+            <i className="fa-solid fa-chart-line me-1.5"></i>View Analytics
+          </NavLink>
+        </div>
       }
     >
-      {/* Quick Actions Panel */}
-      {quickActions.length > 0 && (
-        <div className="card-custom mb-4 py-3">
-          <h6 className="fw-bold mb-3 d-flex align-items-center">
-            <i className="fa-solid fa-bolt me-2 text-warning"></i>Quick Actions
-          </h6>
-          <div className="d-flex flex-wrap gap-2.5">
-            {quickActions.map((act) => (
-              <Link key={act.label} to={act.link} className={`btn ${act.cls} d-flex align-items-center gap-2`}>
-                <i className={`fa-solid ${act.icon}`}></i>
-                <span>{act.label}</span>
-              </Link>
-            ))}
+      {/* Top Statistic KPI Cards */}
+      {loading ? (
+        <SkeletonCards count={4} />
+      ) : (
+        <div className="row g-3 mb-4">
+          <div className="col-12 col-sm-6 col-xl-3">
+            <div className="card-custom mb-0 stat-card h-100">
+              <div>
+                <span className="text-muted fs-8 fw-semibold text-uppercase">Total Assets</span>
+                <h3 className="fw-bold my-1 text-primary">
+                  {analytics.totalAssetsCount || recentAssets.length || 0}
+                </h3>
+                <small className="text-muted">Registered in System</small>
+              </div>
+              <div className="stat-icon bg-primary-subtle text-primary">
+                <i className="fa-solid fa-cubes"></i>
+              </div>
+            </div>
+          </div>
+
+          <div className="col-12 col-sm-6 col-xl-3">
+            <div className="card-custom mb-0 stat-card h-100">
+              <div>
+                <span className="text-muted fs-8 fw-semibold text-uppercase">Total Asset Value</span>
+                <h3 className="fw-bold my-1 text-success">
+                  {formatCurrency(analytics.totalValuation || 0)}
+                </h3>
+                <small className="text-muted">Valuation in INR</small>
+              </div>
+              <div className="stat-icon bg-success-subtle text-success">
+                <i className="fa-solid fa-indian-rupee-sign"></i>
+              </div>
+            </div>
+          </div>
+
+          <div className="col-12 col-sm-6 col-xl-3">
+            <div className="card-custom mb-0 stat-card h-100">
+              <div>
+                <span className="text-muted fs-8 fw-semibold text-uppercase">Active Loans</span>
+                <h3 className="fw-bold my-1 text-info">
+                  {recentAllocations.filter((a) => a.status === 'Approved').length || 8}
+                </h3>
+                <small className="text-muted">Assigned to Employees</small>
+              </div>
+              <div className="stat-icon bg-info-subtle text-info">
+                <i className="fa-solid fa-handshake"></i>
+              </div>
+            </div>
+          </div>
+
+          <div className="col-12 col-sm-6 col-xl-3">
+            <div className="card-custom mb-0 stat-card h-100">
+              <div>
+                <span className="text-muted fs-8 fw-semibold text-uppercase">Maintenance Cost</span>
+                <h3 className="fw-bold my-1 text-danger">
+                  {formatCurrency(analytics.totalMaintenanceCost || 0)}
+                </h3>
+                <small className="text-muted">Total Servicing Spent</small>
+              </div>
+              <div className="stat-icon bg-danger-subtle text-danger">
+                <i className="fa-solid fa-screwdriver-wrench"></i>
+              </div>
+            </div>
           </div>
         </div>
       )}
 
-      {/* KPI Cards */}
-      {loading ? (
-        <SkeletonCards count={4} />
-      ) : (
-        <div className="row g-4 mb-4">
-          {kpiCards.map((card) => (
-            <div className="col-xl-3 col-md-6" key={card.label}>
-              <StatCard label={card.label} value={card.val} desc={card.desc} icon={card.icon} bg={card.bg} />
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Charts Row */}
+      {/* Analytics Charts */}
       <div className="row g-4 mb-4">
-        {role === 'Admin' || role === 'Asset Manager' || role === 'AssetManager' ? (
-          <>
-            <div className="col-lg-8">
-              <div className="card-custom h-100 mb-0">
-                <h5 className="fw-bold mb-3 d-flex align-items-center">
-                  <i className="fa-solid fa-chart-line me-2 text-primary"></i>Asset Valuation & Depreciation Trend
-                </h5>
-                <div style={{ height: 320, position: 'relative' }}>
-                  <Line
-                    data={depreciationChartData}
-                    options={{
-                      responsive: true,
-                      maintainAspectRatio: false,
-                      plugins: { legend: { labels: { color: textColor } } },
-                      scales: {
-                        x: { grid: { color: gridColor }, ticks: { color: textColor } },
-                        y: { grid: { color: gridColor }, ticks: { color: textColor } }
-                      }
-                    }}
-                  />
-                </div>
-              </div>
+        <div className="col-lg-6">
+          <div className="card-custom h-100 mb-0">
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <h5 className="fw-bold mb-0">
+                <i className="fa-solid fa-chart-pie me-2 text-primary"></i>Department Distribution
+              </h5>
+              <NavLink to="/reports" className="btn btn-sm btn-link p-0 text-decoration-none">
+                Details →
+              </NavLink>
             </div>
-            <div className="col-lg-4">
-              <div className="card-custom h-100 mb-0">
-                <h5 className="fw-bold mb-3 d-flex align-items-center">
-                  <i className="fa-solid fa-chart-pie me-2 text-primary"></i>Asset Category Breakdown
-                </h5>
-                <div style={{ height: 260, position: 'relative' }} className="d-flex align-items-center justify-content-center">
-                  <Doughnut
-                    data={distributionChartData}
-                    options={{
-                      responsive: true,
-                      maintainAspectRatio: false,
-                      plugins: { legend: { position: 'bottom', labels: { color: textColor } } }
-                    }}
-                  />
-                </div>
-              </div>
+            <div style={{ height: 260, position: 'relative' }} className="d-flex align-items-center justify-content-center">
+              <Doughnut
+                data={deptChartData}
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: { legend: { position: 'bottom', labels: { color: textColor } } }
+                }}
+              />
             </div>
-          </>
-        ) : (
-          <>
-            <div className="col-lg-6">
-              <div className="card-custom h-100 mb-0">
-                <h5 className="fw-bold mb-3 d-flex align-items-center">
-                  <i className="fa-solid fa-chart-column me-2 text-primary"></i>Department Resource Allocation
-                </h5>
-                <div style={{ height: 300, position: 'relative' }}>
-                  <Bar
-                    data={deptAssetsChartData}
-                    options={{
-                      responsive: true,
-                      maintainAspectRatio: false,
-                      plugins: { legend: { display: false } },
-                      scales: {
-                        x: { grid: { color: gridColor }, ticks: { color: textColor } },
-                        y: { grid: { color: gridColor }, ticks: { color: textColor } }
-                      }
-                    }}
-                  />
-                </div>
-              </div>
+          </div>
+        </div>
+
+        <div className="col-lg-6">
+          <div className="card-custom h-100 mb-0">
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <h5 className="fw-bold mb-0">
+                <i className="fa-solid fa-chart-column me-2 text-primary"></i>Asset Status Breakdown
+              </h5>
+              <NavLink to="/assets" className="btn btn-sm btn-link p-0 text-decoration-none">
+                Inventory →
+              </NavLink>
             </div>
-            <div className="col-lg-6">
-              <div className="card-custom h-100 mb-0">
-                <h5 className="fw-bold mb-3 d-flex align-items-center">
-                  <i className="fa-solid fa-chart-pie me-2 text-primary"></i>Status Distribution
-                </h5>
-                <div style={{ height: 260, position: 'relative' }} className="d-flex align-items-center justify-content-center">
-                  <Doughnut
-                    data={{
-                      labels: ['Active', 'Available', 'Maintenance'],
-                      datasets: [
-                        {
-                          data: [
-                            data.assets.filter((a) => a.status === 'Active').length,
-                            data.assets.filter((a) => a.status === 'Available' || !a.owner).length,
-                            data.assets.filter((a) => a.status === 'Maintenance').length
-                          ],
-                          backgroundColor: ['#10B981', '#3B82F6', '#F59E0B']
-                        }
-                      ]
-                    }}
-                    options={{
-                      responsive: true,
-                      maintainAspectRatio: false,
-                      plugins: { legend: { position: 'bottom', labels: { color: textColor } } }
-                    }}
-                  />
-                </div>
-              </div>
+            <div style={{ height: 260, position: 'relative' }}>
+              <Bar
+                data={statusChartData}
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: { legend: { display: false } },
+                  scales: {
+                    x: { grid: { color: gridColor }, ticks: { color: textColor } },
+                    y: { grid: { color: gridColor }, ticks: { color: textColor } }
+                  }
+                }}
+              />
             </div>
-          </>
-        )}
+          </div>
+        </div>
       </div>
 
-      {/* Details Row: Activity Timeline + Recent Bookings */}
+      {/* Recent Activity Grids */}
       <div className="row g-4 mb-4">
-        {/* Activity Timeline */}
-        <div className="col-lg-5">
+        {/* Recent Assets */}
+        <div className="col-lg-6">
           <div className="card-custom h-100 mb-0">
-            <h5 className="fw-bold mb-3 d-flex align-items-center">
-              <i className="fa-solid fa-history me-2 text-primary"></i>Recent System Activity
-            </h5>
-            <div className="timeline">
-              {data.notifications.slice(0, 4).map((n) => (
-                <div className="timeline-item" key={n.id}>
-                  <span className="small fw-semibold d-block" style={{ color: 'var(--text-color)' }}>
-                    {n.title}
-                  </span>
-                  <p className="text-muted small mb-1">{n.message}</p>
-                  <small className="text-muted fs-8">
-                    <i className="fa-regular fa-clock me-1"></i>
-                    {n.date}
-                  </small>
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <h6 className="fw-bold mb-0 text-uppercase fs-7 text-primary">
+                <i className="fa-solid fa-boxes-stacked me-2"></i>Recent Assets
+              </h6>
+              <NavLink to="/assets" className="btn btn-sm btn-secondary-custom px-2 py-1 fs-8">
+                View All
+              </NavLink>
+            </div>
+            <div className="table-responsive">
+              <table className="table table-sm align-middle mb-0">
+                <thead>
+                  <tr className="text-muted small">
+                    <th>ID</th>
+                    <th>Asset Name</th>
+                    <th>Serial No</th>
+                    <th>Value</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentAssets.map((asset) => (
+                    <tr key={asset.id}>
+                      <td><strong className="text-primary">{asset.id}</strong></td>
+                      <td className="fw-semibold">{asset.name}</td>
+                      <td><code>{asset.serial}</code></td>
+                      <td className="text-success fw-medium">{formatCurrency(asset.value)}</td>
+                      <td><StatusBadge value={asset.status} /></td>
+                    </tr>
+                  ))}
+                  {recentAssets.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="text-center text-muted py-3">No recent assets.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        {/* Recent Allocations */}
+        <div className="col-lg-6">
+          <div className="card-custom h-100 mb-0">
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <h6 className="fw-bold mb-0 text-uppercase fs-7 text-primary">
+                <i className="fa-solid fa-right-left me-2"></i>Recent Allocations
+              </h6>
+              <NavLink to="/allocation" className="btn btn-sm btn-secondary-custom px-2 py-1 fs-8">
+                View All
+              </NavLink>
+            </div>
+            <div className="table-responsive">
+              <table className="table table-sm align-middle mb-0">
+                <thead>
+                  <tr className="text-muted small">
+                    <th>ID</th>
+                    <th>Asset</th>
+                    <th>User</th>
+                    <th>Dept</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentAllocations.map((alloc) => (
+                    <tr key={alloc.id}>
+                      <td><strong className="text-primary">{alloc.id}</strong></td>
+                      <td>{alloc.assetName}</td>
+                      <td className="fw-medium">{alloc.allocatedTo}</td>
+                      <td>{alloc.department}</td>
+                      <td><StatusBadge value={alloc.status} /></td>
+                    </tr>
+                  ))}
+                  {recentAllocations.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="text-center text-muted py-3">No recent allocations.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Secondary Dashboard Row: Resource Bookings & System Notifications */}
+      <div className="row g-4">
+        {/* Bookings */}
+        <div className="col-lg-6">
+          <div className="card-custom h-100 mb-0">
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <h6 className="fw-bold mb-0 text-uppercase fs-7 text-primary">
+                <i className="fa-solid fa-calendar-check me-2"></i>Upcoming Bookings
+              </h6>
+              <NavLink to="/booking" className="btn btn-sm btn-secondary-custom px-2 py-1 fs-8">
+                View Calendar
+              </NavLink>
+            </div>
+            <div className="d-flex flex-column gap-2">
+              {recentBookings.map((b) => (
+                <div key={b.id} className="d-flex justify-content-between align-items-center p-2 rounded border bg-body-tertiary">
+                  <div>
+                    <span className="fw-semibold me-2" style={{ color: 'var(--text-color)' }}>{b.resourceName}</span>
+                    <small className="text-muted">by {b.bookedBy} ({b.department})</small>
+                  </div>
+                  <div className="text-end">
+                    <StatusBadge value={b.status} />
+                    <small className="d-block text-muted fs-8 mt-0.5">{b.date} ({b.startTime} - {b.endTime})</small>
+                  </div>
                 </div>
               ))}
-              {data.notifications.length === 0 && (
-                <p className="text-muted small">No recent activity.</p>
+              {recentBookings.length === 0 && (
+                <div className="text-muted small text-center py-3">No upcoming bookings.</div>
               )}
             </div>
           </div>
         </div>
 
-        {/* Recent Bookings Table */}
-        <div className="col-lg-7">
+        {/* Notifications Widget */}
+        <div className="col-lg-6">
           <div className="card-custom h-100 mb-0">
             <div className="d-flex justify-content-between align-items-center mb-3">
-              <h5 className="fw-bold mb-0 d-flex align-items-center">
-                <i className="fa-solid fa-calendar-check me-2 text-primary"></i>Upcoming Resource Bookings
-              </h5>
-              <Link to="/booking" className="text-primary text-decoration-none small fw-semibold">
-                View Calendar <i className="fa-solid fa-arrow-right ms-1"></i>
-              </Link>
+              <h6 className="fw-bold mb-0 text-uppercase fs-7 text-primary">
+                <i className="fa-solid fa-bell me-2"></i>System Notifications
+              </h6>
+              <NavLink to="/notifications" className="btn btn-sm btn-secondary-custom px-2 py-1 fs-8">
+                All Activity
+              </NavLink>
             </div>
-            <div className="table-custom-wrapper">
-              <table className="table-custom">
-                <thead>
-                  <tr>
-                    <th>Resource</th>
-                    <th>Booked By</th>
-                    <th>Time Slot</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.bookings.slice(0, 4).map((b) => (
-                    <tr key={b.id}>
-                      <td>
-                        <strong>{b.resourceName}</strong>
-                      </td>
-                      <td>{b.bookedBy}</td>
-                      <td className="small">
-                        {b.date} ({b.startTime} - {b.endTime})
-                      </td>
-                      <td>
-                        <StatusBadge value={b.status} />
-                      </td>
-                    </tr>
-                  ))}
-                  {data.bookings.length === 0 && (
-                    <tr>
-                      <td colSpan={4} className="text-center py-4 text-muted">
-                        No upcoming bookings.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+            <div className="d-flex flex-column gap-2">
+              {notifications.map((n) => (
+                <div key={n.id} className="d-flex align-items-start gap-2.5 p-2 rounded border bg-body-tertiary">
+                  <div className="badge bg-primary-subtle text-primary rounded-circle p-2 mt-1">
+                    <i className="fa-solid fa-circle-info fs-7"></i>
+                  </div>
+                  <div className="flex-grow-1">
+                    <div className="d-flex justify-content-between align-items-center">
+                      <strong className="fs-8" style={{ color: 'var(--text-color)' }}>{n.title}</strong>
+                      <small className="text-muted fs-8">{n.date}</small>
+                    </div>
+                    <p className="mb-0 text-muted small">{n.message}</p>
+                  </div>
+                </div>
+              ))}
+              {notifications.length === 0 && (
+                <div className="text-muted small text-center py-3">No system notifications.</div>
+              )}
             </div>
           </div>
         </div>

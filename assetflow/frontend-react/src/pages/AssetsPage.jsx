@@ -7,8 +7,10 @@ import { can } from '../utils/rbac';
 import { PageContainer } from '../components/layout/AppLayout';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { DataTable } from '../components/ui/DataTable';
+import { AssetCard } from '../components/ui/AssetCard';
 import { Modal } from '../components/ui/Modal';
 import { SkeletonLoader } from '../components/ui/SkeletonLoader';
+import { normalizeAsset, formatCurrency } from '../services/normalizers';
 
 export function AssetsPage() {
   const { user } = useAuth();
@@ -19,6 +21,9 @@ export function AssetsPage() {
 
   const [assets, setAssets] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Display view mode: 'card' or 'table'
+  const [viewMode, setViewMode] = useState('card');
 
   // Filters
   const [scope, setScope] = useState(role === 'Employee' ? 'my' : 'all');
@@ -41,7 +46,8 @@ export function AssetsPage() {
     value: '',
     status: 'Active',
     location: '',
-    department: userDept
+    department: userDept,
+    owner: ''
   });
 
   // Request Asset Form State
@@ -57,7 +63,7 @@ export function AssetsPage() {
     setLoading(true);
     try {
       const list = await dataService.assets.list();
-      setAssets(list);
+      setAssets(Array.isArray(list) ? list.map(normalizeAsset) : []);
     } catch (err) {
       console.warn('Failed to load assets:', err);
     } finally {
@@ -69,7 +75,7 @@ export function AssetsPage() {
     loadAssets();
   }, []);
 
-  // Filter logic matching original assets.js
+  // Filter logic
   const filteredAssets = useMemo(() => {
     return assets.filter((asset) => {
       // 1. Scope filter
@@ -83,21 +89,24 @@ export function AssetsPage() {
         if (!assetDept.includes(deptLower)) return false;
       }
 
-      // 2. Search query
+      // 2. Search query (supports name, id, serial, location, owner, department)
       if (search.trim()) {
         const q = search.toLowerCase();
         const matched =
           (asset.name || '').toLowerCase().includes(q) ||
           (asset.id || '').toLowerCase().includes(q) ||
           (asset.serial || '').toLowerCase().includes(q) ||
-          (asset.location || '').toLowerCase().includes(q);
+          (asset.location || '').toLowerCase().includes(q) ||
+          (asset.owner || '').toLowerCase().includes(q) ||
+          (asset.department || '').toLowerCase().includes(q) ||
+          (asset.type || '').toLowerCase().includes(q);
         if (!matched) return false;
       }
 
-      // 3. Type / Category
+      // 3. Category/Type filter
       if (typeFilter && asset.type !== typeFilter) return false;
 
-      // 4. Status
+      // 4. Status filter
       if (statusFilter && asset.status !== statusFilter) return false;
 
       return true;
@@ -111,11 +120,12 @@ export function AssetsPage() {
       setAssetForm({
         name: asset.name || '',
         type: asset.type || 'Laptop',
-        serial: asset.serial || '',
+        serial: asset.serial === 'Not available' ? '' : asset.serial || '',
         value: asset.value || '',
         status: asset.status || 'Active',
-        location: asset.location || '',
-        department: asset.department || userDept
+        location: asset.location === 'Not specified' ? '' : asset.location || '',
+        department: asset.department === 'Unassigned' ? userDept : asset.department || userDept,
+        owner: asset.owner === 'Not assigned' ? '' : asset.owner || ''
       });
     } else {
       setAssetForm({
@@ -125,7 +135,8 @@ export function AssetsPage() {
         value: '25000',
         status: 'Active',
         location: `${userDept} Office`,
-        department: userDept
+        department: userDept,
+        owner: ''
       });
     }
     setShowAssetModal(true);
@@ -133,18 +144,24 @@ export function AssetsPage() {
 
   const handleSaveAsset = async (e) => {
     e.preventDefault();
-    if (!assetForm.name || !assetForm.serial || !assetForm.value) {
-      return Swal.fire('Missing Fields', 'Please fill in all required fields.', 'warning');
+    if (!assetForm.name.trim() || !assetForm.serial.trim() || assetForm.value === '') {
+      return Swal.fire('Missing Fields', 'Please fill in Asset Name, Serial Number, and Cost Value.', 'warning');
     }
 
     setBusy(true);
     try {
+      const payload = {
+        ...assetForm,
+        value: Number(assetForm.value) || 0,
+        owner: assetForm.owner.trim() || null
+      };
+
       if (selectedAsset) {
-        await dataService.assets.update(selectedAsset.id, assetForm);
-        Swal.fire({ icon: 'success', title: 'Asset Updated', timer: 1500, showConfirmButton: false });
+        await dataService.assets.update(selectedAsset.id, payload);
+        Swal.fire({ icon: 'success', title: 'Asset Updated Successfully', timer: 1500, showConfirmButton: false });
       } else {
-        await dataService.assets.create(assetForm);
-        Swal.fire({ icon: 'success', title: 'Asset Registered', timer: 1500, showConfirmButton: false });
+        await dataService.assets.create(payload);
+        Swal.fire({ icon: 'success', title: 'Asset Registered Successfully', timer: 1500, showConfirmButton: false });
       }
       setShowAssetModal(false);
       loadAssets();
@@ -201,10 +218,12 @@ export function AssetsPage() {
   const columns = [
     { label: 'Asset ID' },
     { label: 'Asset Name' },
-    { label: 'Category' },
-    { label: 'Serial / License' },
-    { label: 'Status' },
+    { label: 'Type' },
+    { label: 'Serial Number' },
     { label: 'Value (₹)' },
+    { label: 'Status' },
+    { label: 'Department' },
+    { label: 'Owner / Custodian' },
     { label: 'Location' },
     { label: 'Actions' }
   ];
@@ -212,9 +231,9 @@ export function AssetsPage() {
   return (
     <PageContainer
       title="Asset Inventory"
-      subtitle="Manage hardware, software licenses, and resources"
+      subtitle="Manage IT hardware, software licenses, equipment, and company resources"
       actions={
-        <>
+        <div className="d-flex gap-2">
           {can(role, 'register_asset') && (
             <button className="btn btn-primary-custom text-white" onClick={() => openAddEditModal()}>
               <i className="fa-solid fa-plus me-2"></i>Add Asset
@@ -225,15 +244,15 @@ export function AssetsPage() {
               <i className="fa-solid fa-paper-plane me-2"></i>Request Asset
             </button>
           )}
-        </>
+        </div>
       }
     >
-      {/* Filter & Search Panel */}
+      {/* Search, Filter & View Mode Controls */}
       <div className="card-custom mb-4 py-3">
-        <div className="row g-3 align-items-center">
+        <div className="row g-2 align-items-end">
           {role !== 'Admin' && (
-            <div className="col-md-3">
-              <label className="form-label-custom text-muted fs-8 mb-1">Asset View Scope</label>
+            <div className="col-lg-2 col-md-3 col-6">
+              <label className="form-label-custom text-muted fs-8 mb-1">View Scope</label>
               <select
                 className="form-select form-control-custom fw-semibold text-primary"
                 value={scope}
@@ -241,26 +260,26 @@ export function AssetsPage() {
               >
                 <option value="my">💻 My Assets</option>
                 <option value="department">🏢 Department Assets</option>
-                <option value="all">🌐 All Company Assets</option>
+                <option value="all">🌐 All Assets</option>
               </select>
             </div>
           )}
 
-          <div className={role === 'Admin' ? 'col-md-4' : 'col-md-3'}>
+          <div className={role === 'Admin' ? 'col-lg-4 col-md-4' : 'col-lg-3 col-md-3'}>
             <label className="form-label-custom text-muted fs-8 mb-1">Quick Search</label>
             <div className="position-relative">
               <input
                 type="text"
                 className="form-control-custom w-100 ps-4"
-                placeholder="Search by name, ID, serial..."
+                placeholder="Search name, ID, serial, owner..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
-              <i className="fa-solid fa-search position-absolute text-muted" style={{ right: 15, top: 12 }}></i>
+              <i className="fa-solid fa-search position-absolute text-muted" style={{ right: 12, top: 11 }}></i>
             </div>
           </div>
 
-          <div className="col-md-2">
+          <div className="col-lg-2 col-md-3 col-6">
             <label className="form-label-custom text-muted fs-8 mb-1">Category</label>
             <select
               className="form-select form-control-custom"
@@ -275,10 +294,14 @@ export function AssetsPage() {
               <option value="Accessory">Accessory</option>
               <option value="Projector">Projector</option>
               <option value="Tablet">Tablet</option>
+              <option value="UPS">UPS</option>
+              <option value="Software">Software</option>
+              <option value="Hardware">Hardware</option>
+              <option value="Furniture">Furniture</option>
             </select>
           </div>
 
-          <div className="col-md-2">
+          <div className="col-lg-2 col-md-3 col-6">
             <label className="form-label-custom text-muted fs-8 mb-1">Status</label>
             <select
               className="form-select form-control-custom"
@@ -293,9 +316,28 @@ export function AssetsPage() {
             </select>
           </div>
 
-          <div className="col-md-1 align-self-end">
+          <div className="col-lg-3 col-md-12 col-12 d-flex align-items-center justify-content-end gap-2 ms-auto mt-2 mt-lg-0">
+            <div className="btn-group" role="group" style={{ height: 38 }}>
+              <button
+                type="button"
+                className={`btn btn-sm ${viewMode === 'card' ? 'btn-primary-custom text-white' : 'btn-secondary-custom'}`}
+                onClick={() => setViewMode('card')}
+                title="Grid Cards View"
+              >
+                <i className="fa-solid fa-grip me-1"></i>
+              </button>
+              <button
+                type="button"
+                className={`btn btn-sm ${viewMode === 'table' ? 'btn-primary-custom text-white' : 'btn-secondary-custom'}`}
+                onClick={() => setViewMode('table')}
+                title="Table View"
+              >
+                <i className="fa-solid fa-list me-1"></i>
+              </button>
+            </div>
             <button
-              className="btn btn-secondary-custom w-100"
+              className="btn btn-secondary-custom btn-sm"
+              style={{ height: 38 }}
               title="Reset Filters"
               onClick={() => {
                 setSearch('');
@@ -304,15 +346,43 @@ export function AssetsPage() {
                 setScope(role === 'Employee' ? 'my' : 'all');
               }}
             >
-              <i className="fa-solid fa-rotate-left"></i>
+              <i className="fa-solid fa-rotate-left me-1"></i>Reset
             </button>
           </div>
         </div>
       </div>
 
-      {/* Assets Table */}
+      {/* Main Asset Display (Card Grid View vs Table View) */}
       {loading ? (
         <SkeletonLoader count={8} height={45} />
+      ) : filteredAssets.length === 0 ? (
+        <div className="card-custom text-center py-5">
+          <i className="fa-solid fa-boxes-stacked fs-1 text-muted mb-3 d-block"></i>
+          <h5 className="fw-bold mb-1">No Assets Found</h5>
+          <p className="text-muted small mb-3">No asset records match your search or filter options.</p>
+          {can(role, 'register_asset') && (
+            <button className="btn btn-primary-custom text-white btn-sm" onClick={() => openAddEditModal()}>
+              <i className="fa-solid fa-plus me-1.5"></i>Add New Asset
+            </button>
+          )}
+        </div>
+      ) : viewMode === 'card' ? (
+        <div className="row g-3">
+          {filteredAssets.map((asset) => (
+            <div className="col-12 col-md-6 col-xl-4" key={asset.id}>
+              <AssetCard
+                asset={asset}
+                role={role}
+                onDetail={(item) => {
+                  setDetailAsset(item);
+                  setShowDetailModal(true);
+                }}
+                onEdit={(item) => openAddEditModal(item)}
+                onReturn={(item) => handleReturnAsset(item)}
+              />
+            </div>
+          ))}
+        </div>
       ) : (
         <DataTable
           columns={columns}
@@ -321,35 +391,36 @@ export function AssetsPage() {
           emptyMessage="No assets match your search criteria."
           renderRow={(asset) => (
             <tr key={asset.id}>
-              <td>
+              <td className="text-nowrap">
                 <strong
-                  className="text-primary cursor-pointer"
+                  className="text-primary cursor-pointer text-nowrap"
                   onClick={() => {
                     setDetailAsset(asset);
                     setShowDetailModal(true);
                   }}
-                  title="View Asset Details"
+                  title={asset.id}
                 >
-                  {asset.id}
+                  {asset.id.length > 18 ? `${asset.id.slice(0, 15)}...` : asset.id}
                 </strong>
               </td>
               <td>
-                <div className="fw-semibold" style={{ color: 'var(--text-color)' }}>
+                <div className="fw-semibold text-truncate" style={{ color: 'var(--text-color)', maxWidth: 200 }} title={asset.name}>
                   {asset.name}
                 </div>
-                {asset.owner && <small className="text-muted d-block">Custodian: {asset.owner}</small>}
               </td>
-              <td>{asset.type}</td>
-              <td>
-                <code className="text-muted">{asset.serial || '--'}</code>
+              <td className="text-nowrap">{asset.type}</td>
+              <td className="text-nowrap">
+                <code className="text-nowrap">{asset.serial}</code>
               </td>
-              <td>
+              <td className="fw-bold text-success text-nowrap">{formatCurrency(asset.value)}</td>
+              <td className="text-nowrap">
                 <StatusBadge value={asset.status} />
               </td>
-              <td className="fw-medium">₹{Number(asset.value || 0).toLocaleString('en-IN')}</td>
-              <td>{asset.location || '--'}</td>
-              <td>
-                <div className="d-flex gap-1.5">
+              <td className="text-nowrap">{asset.department}</td>
+              <td className="text-nowrap">{asset.owner}</td>
+              <td className="text-nowrap">{asset.location}</td>
+              <td className="text-nowrap">
+                <div className="d-flex gap-1.5 align-items-center">
                   <button
                     className="btn btn-sm btn-secondary-custom p-1.5"
                     title="View Details"
@@ -369,7 +440,7 @@ export function AssetsPage() {
                       <i className="fa-solid fa-pen-to-square"></i>
                     </button>
                   )}
-                  {asset.owner && (
+                  {asset.owner && asset.owner !== 'Not assigned' && (
                     <button
                       className="btn btn-sm btn-outline-danger p-1.5"
                       title="Return Asset"
@@ -399,7 +470,7 @@ export function AssetsPage() {
                   <input
                     type="text"
                     className="form-control form-control-custom"
-                    placeholder="e.g. MacBook Pro 16&quot;"
+                    placeholder="e.g. Dell Latitude 5440"
                     value={assetForm.name}
                     onChange={(e) => setAssetForm({ ...assetForm, name: e.target.value })}
                     required
@@ -407,7 +478,7 @@ export function AssetsPage() {
                 </div>
 
                 <div className="col-md-6">
-                  <label className="form-label-custom">Category <span className="text-danger">*</span></label>
+                  <label className="form-label-custom">Category / Type <span className="text-danger">*</span></label>
                   <select
                     className="form-select form-control-custom"
                     value={assetForm.type}
@@ -426,11 +497,11 @@ export function AssetsPage() {
                 </div>
 
                 <div className="col-md-6">
-                  <label className="form-label-custom">Serial / License Number <span className="text-danger">*</span></label>
+                  <label className="form-label-custom">Serial Number <span className="text-danger">*</span></label>
                   <input
                     type="text"
                     className="form-control form-control-custom"
-                    placeholder="e.g. AF-DEMO-9912"
+                    placeholder="e.g. AF-DL-001"
                     value={assetForm.serial}
                     onChange={(e) => setAssetForm({ ...assetForm, serial: e.target.value })}
                     required
@@ -442,9 +513,33 @@ export function AssetsPage() {
                   <input
                     type="number"
                     className="form-control form-control-custom"
-                    placeholder="e.g. 45000"
+                    placeholder="e.g. 75000"
                     value={assetForm.value}
                     onChange={(e) => setAssetForm({ ...assetForm, value: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div className="col-md-6">
+                  <label className="form-label-custom">Department <span className="text-danger">*</span></label>
+                  <input
+                    type="text"
+                    className="form-control form-control-custom"
+                    placeholder="e.g. IT"
+                    value={assetForm.department}
+                    onChange={(e) => setAssetForm({ ...assetForm, department: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div className="col-md-6">
+                  <label className="form-label-custom">Location <span className="text-danger">*</span></label>
+                  <input
+                    type="text"
+                    className="form-control form-control-custom"
+                    placeholder="e.g. IT Office"
+                    value={assetForm.location}
+                    onChange={(e) => setAssetForm({ ...assetForm, location: e.target.value })}
                     required
                   />
                 </div>
@@ -464,19 +559,19 @@ export function AssetsPage() {
                 </div>
 
                 <div className="col-md-6">
-                  <label className="form-label-custom">Location</label>
+                  <label className="form-label-custom">Owner / Assigned User</label>
                   <input
                     type="text"
                     className="form-control form-control-custom"
-                    placeholder="e.g. IT Office, Surat HQ"
-                    value={assetForm.location}
-                    onChange={(e) => setAssetForm({ ...assetForm, location: e.target.value })}
+                    placeholder="e.g. Riya Shah (or leave blank)"
+                    value={assetForm.owner}
+                    onChange={(e) => setAssetForm({ ...assetForm, owner: e.target.value })}
                   />
                 </div>
               </div>
             </div>
 
-            <div className="modal-footer border-top px-4 py-3">
+            <div className="modal-footer border-top px-4 py-3 d-flex justify-content-end gap-2">
               <button
                 type="button"
                 className="btn btn-secondary-custom"
@@ -489,7 +584,7 @@ export function AssetsPage() {
                 className="btn btn-primary-custom text-white"
                 disabled={busy}
               >
-                {busy ? 'Saving...' : 'Save Asset'}
+                {busy ? 'Saving Asset...' : 'Save Asset'}
               </button>
             </div>
           </form>
@@ -499,7 +594,7 @@ export function AssetsPage() {
       {/* Asset Details Modal */}
       {showDetailModal && detailAsset && (
         <Modal
-          title={`Asset Details - ${detailAsset.id}`}
+          title={`Asset Specification - ${detailAsset.id}`}
           size="modal-md"
           onClose={() => setShowDetailModal(false)}
         >
@@ -517,25 +612,28 @@ export function AssetsPage() {
 
             <div className="border rounded-3 p-3 bg-body-tertiary">
               <div className="row g-2 small">
+                <div className="col-6 text-muted">Asset ID:</div>
+                <div className="col-6 fw-bold text-end text-primary">{detailAsset.id}</div>
+
                 <div className="col-6 text-muted">Category:</div>
                 <div className="col-6 fw-semibold text-end">{detailAsset.type}</div>
 
                 <div className="col-6 text-muted">Serial Number:</div>
                 <div className="col-6 fw-semibold text-end"><code>{detailAsset.serial}</code></div>
 
-                <div className="col-6 text-muted">Cost Valuation:</div>
-                <div className="col-6 fw-semibold text-end text-success">
-                  ₹{Number(detailAsset.value || 0).toLocaleString('en-IN')}
+                <div className="col-6 text-muted">Valuation / Cost:</div>
+                <div className="col-6 fw-bold text-end text-success">
+                  {formatCurrency(detailAsset.value)}
                 </div>
 
-                <div className="col-6 text-muted">Current Custodian:</div>
-                <div className="col-6 fw-semibold text-end">{detailAsset.owner || 'Unassigned (In Stock)'}</div>
+                <div className="col-6 text-muted">Current Owner:</div>
+                <div className="col-6 fw-semibold text-end">{detailAsset.owner}</div>
 
                 <div className="col-6 text-muted">Department:</div>
-                <div className="col-6 fw-semibold text-end">{detailAsset.department || 'Central Stock'}</div>
+                <div className="col-6 fw-semibold text-end">{detailAsset.department}</div>
 
                 <div className="col-6 text-muted">Location:</div>
-                <div className="col-6 fw-semibold text-end">{detailAsset.location || '--'}</div>
+                <div className="col-6 fw-semibold text-end">{detailAsset.location}</div>
               </div>
             </div>
           </div>
@@ -592,7 +690,7 @@ export function AssetsPage() {
               </div>
             </div>
 
-            <div className="modal-footer border-top px-4 py-3">
+            <div className="modal-footer border-top px-4 py-3 d-flex justify-content-end gap-2">
               <button type="button" className="btn btn-secondary-custom" onClick={() => setShowRequestModal(false)}>
                 Cancel
               </button>

@@ -10,6 +10,7 @@ import { PageContainer } from '../components/layout/AppLayout';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { Modal } from '../components/ui/Modal';
 import { SkeletonLoader } from '../components/ui/SkeletonLoader';
+import { normalizeBooking } from '../services/normalizers';
 
 const STANDARD_TIME_SLOTS = [
   { label: '08:00', start: '08:00', end: '09:00' },
@@ -60,8 +61,8 @@ export function BookingPage() {
         dataService.bookings.list(),
         dataService.assets.list()
       ]);
-      setBookings(bookList);
-      setAssets(assetList);
+      setBookings(Array.isArray(bookList) ? bookList.map(normalizeBooking) : []);
+      setAssets(Array.isArray(assetList) ? assetList : []);
     } catch (err) {
       console.warn('Failed to load bookings:', err);
     } finally {
@@ -365,7 +366,7 @@ export function BookingPage() {
                       <div className="fw-bold" style={{ color: 'var(--text-color)' }}>{b.resourceName}</div>
                       <div className="text-muted small">
                         <i className="fa-regular fa-user me-1 text-primary"></i>
-                        {b.bookedBy} • {b.date} ({b.startTime} - {b.endTime})
+                        {b.bookedBy} <span className="badge bg-secondary-subtle text-secondary rounded-pill ms-1 me-1">{b.department || 'IT'}</span> • {b.date} ({b.startTime} - {b.endTime})
                       </div>
                     </div>
                     <div className="d-flex align-items-center gap-2">

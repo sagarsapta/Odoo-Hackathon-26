@@ -7,6 +7,7 @@ import { StatusBadge } from '../components/ui/StatusBadge';
 import { DataTable } from '../components/ui/DataTable';
 import { Modal } from '../components/ui/Modal';
 import { SkeletonLoader } from '../components/ui/SkeletonLoader';
+import { normalizeAllocation } from '../services/normalizers';
 
 export function AllocationPage() {
   const { user } = useAuth();
@@ -55,10 +56,10 @@ export function AllocationPage() {
         dataService.departments.list(),
         dataService.users.list()
       ]);
-      setAllocations(allocList);
-      setAssets(assetList);
-      setDepartments(deptList);
-      setUsers(userList);
+      setAllocations(Array.isArray(allocList) ? allocList.map(normalizeAllocation) : []);
+      setAssets(Array.isArray(assetList) ? assetList : []);
+      setDepartments(Array.isArray(deptList) ? deptList : []);
+      setUsers(Array.isArray(userList) ? userList : []);
 
       if (assetList.length > 0 && !selectedAssetId) {
         setSelectedAssetId(assetList[0].id);

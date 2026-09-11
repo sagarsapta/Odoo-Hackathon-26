@@ -7,6 +7,7 @@ import { StatusBadge } from '../components/ui/StatusBadge';
 import { DataTable } from '../components/ui/DataTable';
 import { Modal } from '../components/ui/Modal';
 import { SkeletonCards, SkeletonLoader } from '../components/ui/SkeletonLoader';
+import { normalizeAudit } from '../services/normalizers';
 
 export function AuditPage() {
   const { user } = useAuth();
@@ -37,8 +38,8 @@ export function AuditPage() {
         dataService.audits.list(),
         dataService.assets.list()
       ]);
-      setAudits(auditList);
-      setAssets(assetList);
+      setAudits(Array.isArray(auditList) ? auditList.map(normalizeAudit) : []);
+      setAssets(Array.isArray(assetList) ? assetList : []);
     } catch (err) {
       console.warn('Failed to load audits:', err);
     } finally {

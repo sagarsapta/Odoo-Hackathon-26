@@ -5,6 +5,7 @@ import { dataService } from '../services/dataService';
 import { PageContainer } from '../components/layout/AppLayout';
 import { Modal } from '../components/ui/Modal';
 import { SkeletonLoader } from '../components/ui/SkeletonLoader';
+import { normalizeNotification } from '../services/normalizers';
 
 export function NotificationsPage() {
   const { user } = useAuth();
@@ -26,7 +27,7 @@ export function NotificationsPage() {
     setLoading(true);
     try {
       const list = await dataService.notifications.list();
-      setNotifications(list);
+      setNotifications(Array.isArray(list) ? list.map(normalizeNotification) : []);
     } catch (err) {
       console.warn('Failed to load notifications:', err);
     } finally {
